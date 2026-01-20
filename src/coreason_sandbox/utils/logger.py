@@ -30,17 +30,21 @@ logger.add(
     ),
 )
 
-# Ensure logs directory exists
-log_path = Path("logs")
-if not log_path.exists():
-    log_path.mkdir(parents=True, exist_ok=True)
+def setup_logging():
+    """Configure the logger with console and file sinks."""
+    # Ensure logs directory exists
+    log_path = Path("logs")
+    if not log_path.exists():
+        log_path.mkdir(parents=True, exist_ok=True)
 
-# Sink 2: File (JSON, Rotation, Retention)
-logger.add(
-    "logs/app.log",
-    rotation="500 MB",
-    retention="10 days",
-    serialize=True,
-    enqueue=True,
-    level="INFO",
-)
+    # Sink 2: File (JSON, Rotation, Retention)
+    logger.add(
+        "logs/app.log",
+        rotation="500 MB",
+        retention="10 days",
+        serialize=True,
+        enqueue=True,
+        level="INFO",
+    )
+
+setup_logging()

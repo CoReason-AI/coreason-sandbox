@@ -8,8 +8,17 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_sandbox
 
-from coreason_sandbox.main import hello_world
+"""Pydantic models for sandbox configuration."""
+
+from typing import Literal
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-def test_hello_world() -> None:
-    assert hello_world() == "Hello World!"
+class SandboxConfig(BaseSettings):
+    """Configuration for the sandbox runtime environment."""
+
+    model_config = SettingsConfigDict(env_prefix="SANDBOX_")
+
+    RUNTIME: Literal["docker", "e2b"] = "docker"
+    E2B_API_KEY: str | None = None
