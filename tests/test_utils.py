@@ -9,43 +9,34 @@
 # Source Code: https://github.com/CoReason-AI/coreason_sandbox
 
 import importlib
-from pathlib import Path
+import os
 import shutil
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
-from coreason_sandbox.utils import logger as logger_module
-from coreason_sandbox.utils.logger import logger
-
-
-def test_logger_initialization_when_dir_exists() -> None:
-    """Test that the logger is initialized correctly and creates the log directory."""
-    # Since the logger is initialized on import, we check side effects
-
-    # Check if logs directory creation is handled
-    # Note: running this test might actually create the directory in the test environment
-    # if it doesn't exist.
-
-    log_path = Path("logs")
-    assert log_path.exists()
-    assert log_path.is_dir()
-
-    # Verify app.log creation if it was logged to (it might be empty or not created until log)
-    # logger.info("Test log")
-    # assert (log_path / "app.log").exists()
+from coreason_sandbox.utils import logger
 
 
-def test_logger_initialization_creates_dir() -> None:
-    """Test that the logger creates the log directory if it doesn't exist."""
-    log_path = Path("logs")
-    if log_path.exists():
+def test_logger_initialization_in_clean_env() -> None:
+    """
+    Test that the logger initialization code correctly creates the 'logs' directory
+    in a clean environment where it does not exist.
+    """
+    with TemporaryDirectory() as temp_dir:
+        # To prevent side effects with other tests, we run this in an isolated
+        # temporary directory.
+        os.chdir(temp_dir)
+
+        # Force a reload of the logger module to re-trigger the initialization
+        # logic within the temporary directory.
+        importlib.reload(logger)
+
+        log_path = Path("logs")
+        assert log_path.exists(), "The 'logs' directory was not created."
+        assert log_path.is_dir()
+
+        # Clean up the created directory to avoid interfering with other tests
         shutil.rmtree(log_path)
-
-    assert not log_path.exists()
-
-    # Reload the logger module to trigger the directory creation logic
-    importlib.reload(logger_module)
-
-    assert log_path.exists()
-    assert log_path.is_dir()
 
 
 def test_logger_exports() -> None:
