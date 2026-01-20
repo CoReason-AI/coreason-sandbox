@@ -8,26 +8,37 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_sandbox
 
+import importlib
+import shutil
 from pathlib import Path
 
-from coreason_sandbox.utils.logger import logger
+from fda_orange_book.utils import logger as logger_module
+from fda_orange_book.utils.logger import logger
 
 
 def test_logger_initialization() -> None:
     """Test that the logger is initialized correctly and creates the log directory."""
-    # Since the logger is initialized on import, we check side effects
-
-    # Check if logs directory creation is handled
-    # Note: running this test might actually create the directory in the test environment
-    # if it doesn't exist.
-
     log_path = Path("logs")
+
+    # The logger is initialized on the first import.
+    # We test both cases: when the directory exists and when it does not.
+
+    # 1. Test the case where the directory does not exist.
+    # We need to remove it first.
+    if log_path.exists():
+        shutil.rmtree(log_path)
+
+    # Now, reload the logger module to trigger the directory creation.
+    importlib.reload(logger_module)
     assert log_path.exists()
     assert log_path.is_dir()
 
-    # Verify app.log creation if it was logged to (it might be empty or not created until log)
-    # logger.info("Test log")
-    # assert (log_path / "app.log").exists()
+    # 2. Test the case where the directory already exists.
+    # The directory was created in the previous step.
+    # Reloading again should not cause an error.
+    importlib.reload(logger_module)
+    assert log_path.exists()
+    assert log_path.is_dir()
 
 
 def test_logger_exports() -> None:
