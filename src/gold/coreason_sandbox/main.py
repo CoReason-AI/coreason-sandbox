@@ -7,3 +7,10 @@
 # Commercial use beyond a 30-day trial requires a separate license.
 #
 # Source Code: https://github.com/CoReason-AI/coreason_sandbox
+
+from coreason_sandbox.utils.logger import logger
+
+
+def hello_world() -> str:
+    logger.info("Hello World!")
+    return "Hello World!"

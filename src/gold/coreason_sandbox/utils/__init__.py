@@ -7,3 +7,7 @@
 # Commercial use beyond a 30-day trial requires a separate license.
 #
 # Source Code: https://github.com/CoReason-AI/coreason_sandbox
+
+"""
+Utils module.
+"""
