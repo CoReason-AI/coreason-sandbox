@@ -8,7 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_sandbox
 
-from coreason_sandbox.main import hello_world
+from fda_orange_book.main import hello_world
 
 
 def test_hello_world() -> None:
