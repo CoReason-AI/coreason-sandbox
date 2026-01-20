@@ -10,7 +10,7 @@
 
 from pathlib import Path
 
-from coreason_sandbox.utils.logger import logger
+from fda_orange_book.utils.logger import logger
 
 
 def test_logger_initialization() -> None:
