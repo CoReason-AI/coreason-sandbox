@@ -8,8 +8,14 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_sandbox
 
-from fda_orange_book.main import hello_world
+"""
+coreason-sandbox
+"""
 
+__version__ = "0.1.0"
+__author__ = "Gowtham A Rao"
+__email__ = "gowtham.rao@coreason.ai"
 
-def test_hello_world() -> None:
-    assert hello_world() == "Hello World!"
+from .main import hello_world
+
+__all__ = ["hello_world"]

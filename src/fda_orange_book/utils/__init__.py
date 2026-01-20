@@ -8,8 +8,6 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_sandbox
 
-from fda_orange_book.main import hello_world
-
-
-def test_hello_world() -> None:
-    assert hello_world() == "Hello World!"
+"""
+Utils module.
+"""
