@@ -8,7 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_sandbox
 
-from coreason_sandbox.utils.logger import logger
+from coreason_sandbox.utils import logger
 
 
 def hello_world() -> str:
