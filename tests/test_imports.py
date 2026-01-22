@@ -8,10 +8,11 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_sandbox
 
-"""
-coreason-sandbox
-"""
-
-__version__ = "0.1.0"
-__author__ = "Gowtham A Rao"
-__email__ = "gowtham.rao@coreason.ai"
+def test_import_coreason_sandbox_package():
+    """Tests that the main application package is importable."""
+    try:
+        import coreason_sandbox
+        from coreason_sandbox.models.models import ExecutionResult
+        from coreason_sandbox.runtime.base import SandboxRuntime
+    except ImportError as e:
+        assert False, f"Failed to import from the 'coreason_sandbox' package: {e}"
