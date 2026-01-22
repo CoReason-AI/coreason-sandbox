@@ -41,7 +41,7 @@ class MockRuntime(SandboxRuntime):
 
 class IncompleteRuntime(SandboxRuntime):
     # Missing abstract methods to test enforcement
-    pass  # type: ignore
+    pass
 
 
 @pytest.mark.asyncio

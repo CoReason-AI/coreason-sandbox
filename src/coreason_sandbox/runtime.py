@@ -29,9 +29,7 @@ class SandboxRuntime(ABC):
         pass  # pragma: no cover
 
     @abstractmethod
-    async def execute(
-        self, code: str, language: Literal["python", "bash", "r"]
-    ) -> ExecutionResult:
+    async def execute(self, code: str, language: Literal["python", "bash", "r"]) -> ExecutionResult:
         """
         Run script and capture output.
         """
