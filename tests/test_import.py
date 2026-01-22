@@ -8,27 +8,21 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_sandbox
 
-def test_gold_package_importable():
-    """
-    Tests that the main application package, coreason_sandbox, is importable from its new location in src/gold.
-    This is a basic smoke test to ensure the pyproject.toml and the project structure are correctly configured.
-    """
-    try:
-        from coreason_sandbox.main import hello_world
-        assert hello_world() == "Hello World!"
-    except ImportError as e:
-        assert False, f"Failed to import from coreason_sandbox: {e}"
+"""Test that the public API is importable."""
 
-def test_silver_package_importable():
-    """
-    Tests that the silver package, containing the interfaces, is importable.
-    This verifies that the multi-package setup in pyproject.toml is working.
-    """
+
+def test_imports():
+    """Verify that core components can be imported."""
     try:
-        from silver.interfaces import SandboxRuntime, ExecutionResult, FileReference
-        # Just checking for import errors, no need to instantiate the ABC
-        assert issubclass(SandboxRuntime, object)
-        assert issubclass(ExecutionResult, object)
-        assert issubclass(FileReference, object)
+        from coreason_sandbox import (
+            ExecutionResult,
+            FileReference,
+            SandboxRuntime,
+        )
     except ImportError as e:
-        assert False, f"Failed to import from silver: {e}"
+        assert False, f"Failed to import core components: {e}"
+
+    # Simple assertions to ensure the imported objects are classes
+    assert isinstance(SandboxRuntime, type)
+    assert isinstance(ExecutionResult, type)
+    assert isinstance(FileReference, type)
