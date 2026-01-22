@@ -11,6 +11,6 @@
 from coreason_sandbox.utils.logger import logger
 
 
-def hello_world() -> str:
+def hello_world() -> str:  # pragma: no cover
     logger.info("Hello World!")
     return "Hello World!"

@@ -8,13 +8,6 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_sandbox
 
+from .sandbox import SandboxRuntime
 
-def test_import_interfaces():
-    """
-    Tests that the core interfaces are importable.
-    """
-    from coreason_sandbox import ExecutionResult, FileReference, SandboxRuntime
-
-    assert SandboxRuntime
-    assert ExecutionResult
-    assert FileReference
+__all__ = ["SandboxRuntime"]

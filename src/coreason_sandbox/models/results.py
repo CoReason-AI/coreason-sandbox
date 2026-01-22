@@ -8,13 +8,20 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_sandbox
 
+from typing import List, Optional
 
-def test_import_interfaces():
-    """
-    Tests that the core interfaces are importable.
-    """
-    from coreason_sandbox import ExecutionResult, FileReference, SandboxRuntime
+from pydantic import BaseModel
 
-    assert SandboxRuntime
-    assert ExecutionResult
-    assert FileReference
+
+class FileReference(BaseModel):
+    path: str
+    url: Optional[str] = None
+    content: Optional[bytes] = None
+
+
+class ExecutionResult(BaseModel):
+    stdout: str
+    stderr: str
+    exit_code: int
+    artifacts: List[FileReference]
+    execution_duration: float
