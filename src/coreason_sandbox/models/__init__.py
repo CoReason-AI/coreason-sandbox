@@ -9,14 +9,9 @@
 # Source Code: https://github.com/CoReason-AI/coreason_sandbox
 
 """
-coreason-sandbox: A secure, ephemeral execution environment.
+Data models for the coreason-sandbox package.
 """
 
-__version__ = "0.2.0"
-__author__ = "Gowtham A Rao"
-__email__ = "gowtham.rao@coreason.ai"
+from .result import ExecutionResult, FileReference
 
-from .models import ExecutionResult, FileReference
-from .runtime import SandboxRuntime
-
-__all__ = ["SandboxRuntime", "ExecutionResult", "FileReference"]
+__all__ = ["ExecutionResult", "FileReference"]
