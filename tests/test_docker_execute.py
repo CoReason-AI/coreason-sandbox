@@ -1,7 +1,8 @@
 from typing import Any
 from unittest.mock import MagicMock, patch
-
+import asyncio
 import pytest
+import time
 from coreason_sandbox.models import ExecutionResult
 from coreason_sandbox.runtimes.docker import DockerRuntime
 
@@ -130,3 +131,83 @@ async def test_execute_artifact_handling_failure(docker_runtime: Any) -> None:
         assert result.exit_code == 0
         # Artifacts should be empty because download failed
         assert len(result.artifacts) == 0
+
+@pytest.mark.asyncio
+async def test_execute_timeout(docker_runtime: Any) -> None:
+    # Test that execution times out after limit
+
+    # Define a side effect that sleeps to simulate long execution
+    # Since we are using asyncio.to_thread, time.sleep works (it blocks the thread)
+    def blocking_exec(*args, **kwargs):
+        time.sleep(0.5)
+        return (0, (b"done", b""))
+
+    # Mock wait_for to have a very short timeout so we don't actually wait 60s
+    # But since I implemented strict 60.0 in code, I should probably patch wait_for
+    # OR just use the fact that I can set the timeout in the `wait_for` call inside the code?
+    # I hardcoded 60.0. I can patch asyncio.wait_for? No, that patches the function.
+    # A better way is to make the mock sleep longer than the wait_for timeout,
+    # but I can't wait 60s in a test.
+    # So I must patch the timeout value OR patch wait_for.
+
+    # Let's patch asyncio.wait_for to enforce a short timeout
+    # But wait_for is a function in asyncio module.
+
+    # Correct approach:
+    # 1. Mock `exec_run` to sleep for 2 seconds.
+    # 2. Patch `asyncio.wait_for` to call the real wait_for but with a forced shorter timeout?
+    # Or just rely on the fact that I hardcoded 60s? I can't easily change the hardcoded 60s without refactoring code to use a config/variable.
+    #
+    # Let's patch the `DockerRuntime.execute` logic? No, that defeats the purpose.
+    # I should really use a constant for the timeout so it can be patched.
+    #
+    # But since I am editing the code, let's verify if I can test it without waiting.
+    # If I patch `asyncio.wait_for`, I can verify it was called.
+
+    original_wait_for = asyncio.wait_for
+
+    async def mock_wait_for(fut, timeout):
+        # We ignore the requested timeout (60s) and use a very short one (0.1s)
+        # effectively simulating that the task took too long relative to the limit
+        return await original_wait_for(fut, timeout=0.1)
+
+    # Prepare mocks
+    docker_runtime.container.exec_run.side_effect = blocking_exec
+
+    # We need to mock list_files (ls before) to succeed quickly
+    # The current implementation calls list_files BEFORE execution.
+    # So:
+    # 1. ls (success)
+    # 2. exec (timeout)
+
+    # But side_effect needs to handle the mix.
+    # My `blocking_exec` is for `exec_run`.
+    # `list_files` calls `exec_run` too.
+    # So I need smart dispatch or assume list_files happens before.
+
+    # Simpler:
+    # docker_runtime.container.exec_run.side_effect = [(0, b""), blocking_exec]
+    # But blocking_exec is a function, not a return value.
+    # side_effect can be a list of mixed types (exceptions or values), but functions?
+    # side_effect can be an iterable. If an element is an exception it raises. If callable? No.
+    # side_effect can be a SINGLE callable.
+
+    call_count = 0
+    def side_effect(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1: # ls before
+            return (0, b"")
+        if call_count == 2: # exec code
+            time.sleep(0.5) # Blocks for 0.5s
+            return (0, (b"done", b""))
+        return (0, b"")
+
+    docker_runtime.container.exec_run.side_effect = side_effect
+
+    with patch("asyncio.wait_for", side_effect=mock_wait_for):
+        with pytest.raises(TimeoutError, match="Execution exceeded"):
+            await docker_runtime.execute("while True: pass", "python")
+
+    # Verify restart was called
+    docker_runtime.container.restart.assert_called_once()
