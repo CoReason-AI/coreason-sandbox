@@ -1,3 +1,5 @@
+import asyncio
+import time
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -130,3 +132,46 @@ async def test_execute_artifact_handling_failure(docker_runtime: Any) -> None:
         assert result.exit_code == 0
         # Artifacts should be empty because download failed
         assert len(result.artifacts) == 0
+
+
+@pytest.mark.asyncio
+async def test_execute_timeout(docker_runtime: Any) -> None:
+    # Test that execution times out after limit
+
+    # Define a side effect that sleeps to simulate long execution
+    # Since we are using asyncio.to_thread, time.sleep works (it blocks the thread)
+    def blocking_exec(*args: Any, **kwargs: Any) -> tuple[int, tuple[bytes, bytes]]:
+        time.sleep(0.5)
+        return (0, (b"done", b""))
+
+    # Mock wait_for to have a very short timeout so we don't actually wait 60s
+    original_wait_for = asyncio.wait_for
+
+    async def mock_wait_for(fut: Any, timeout: float) -> Any:
+        # We ignore the requested timeout (60s) and use a very short one (0.1s)
+        # effectively simulating that the task took too long relative to the limit
+        return await original_wait_for(fut, timeout=0.1)
+
+    # Prepare mocks
+    docker_runtime.container.exec_run.side_effect = blocking_exec
+
+    call_count = 0
+
+    def side_effect(*args: Any, **kwargs: Any) -> tuple[int, bytes | tuple[bytes, bytes]]:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:  # ls before
+            return (0, b"")
+        if call_count == 2:  # exec code
+            time.sleep(0.5)  # Blocks for 0.5s
+            return (0, (b"done", b""))
+        return (0, b"")
+
+    docker_runtime.container.exec_run.side_effect = side_effect
+
+    with patch("asyncio.wait_for", side_effect=mock_wait_for):
+        with pytest.raises(TimeoutError, match="Execution exceeded"):
+            await docker_runtime.execute("while True: pass", "python")
+
+    # Verify restart was called
+    docker_runtime.container.restart.assert_called_once()
