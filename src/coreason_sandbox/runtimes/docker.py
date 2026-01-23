@@ -246,8 +246,9 @@ class DockerRuntime(SandboxRuntime):
             logger.info(f"Terminating Docker sandbox: {self.container.short_id}")
             try:
                 self.container.kill()
-                self.container = None
             except DockerException as e:
                 logger.warning(f"Error terminating Docker sandbox: {e}")
+            finally:
+                self.container = None
         else:
             logger.warning("Attempted to terminate non-existent Docker sandbox")

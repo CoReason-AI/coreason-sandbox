@@ -36,3 +36,21 @@ async def test_veritas_disabled() -> None:
 
         code_hash = await integrator.log_pre_execution("code", "python")
         assert code_hash is not None  # Still returns hash
+
+
+@pytest.mark.asyncio
+async def test_veritas_init_exception() -> None:
+    with patch("coreason_sandbox.utils.veritas.IERLogger") as mock:
+        mock.side_effect = Exception("Init failed")
+        integrator = VeritasIntegrator()
+        assert integrator.enabled is False
+
+
+@pytest.mark.asyncio
+async def test_veritas_log_exception(mock_ier_logger: Any) -> None:
+    mock_ier_logger.return_value.log_event.side_effect = Exception("Log failed")
+    integrator = VeritasIntegrator()
+    assert integrator.enabled is True
+
+    # Should not raise exception
+    await integrator.log_pre_execution("code", "python")

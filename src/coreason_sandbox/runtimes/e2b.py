@@ -181,8 +181,9 @@ class E2BRuntime(SandboxRuntime):
             logger.info(f"Terminating E2B sandbox: {self.sandbox.sandbox_id}")
             try:
                 self.sandbox.close()
-                self.sandbox = None
             except Exception as e:
                 logger.warning(f"Error terminating E2B sandbox: {e}")
+            finally:
+                self.sandbox = None
         else:
             logger.warning("Attempted to terminate non-existent E2B sandbox")

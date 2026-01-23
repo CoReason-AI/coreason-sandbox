@@ -93,3 +93,10 @@ async def test_mcp_shutdown(mock_factory: Any, mock_runtime: Any) -> None:
 
     mock_runtime.terminate.assert_called_once()
     assert mcp.started is False
+
+
+@pytest.mark.asyncio
+async def test_mcp_shutdown_not_started(mock_factory: Any, mock_runtime: Any) -> None:
+    mcp = SandboxMCP()
+    await mcp.shutdown()
+    mock_runtime.terminate.assert_not_called()
