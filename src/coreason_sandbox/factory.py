@@ -15,9 +15,9 @@ class SandboxFactory:
         Returns an instance of the configured SandboxRuntime.
         """
         if config.runtime == "docker":
-            return DockerRuntime(allowed_packages=config.allowed_packages)
+            return DockerRuntime(allowed_packages=config.allowed_packages, timeout=config.execution_timeout)
         elif config.runtime == "e2b":
-            return E2BRuntime()
+            return E2BRuntime(timeout=config.execution_timeout)
         else:
             # This should be unreachable due to Pydantic validation, but for safety:
             raise ValueError(f"Unknown runtime: {config.runtime}")  # pragma: no cover
