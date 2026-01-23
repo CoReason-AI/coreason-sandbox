@@ -18,9 +18,12 @@ class E2BRuntime(SandboxRuntime):
     E2B Cloud implementation of the SandboxRuntime.
     """
 
-    def __init__(self, api_key: str | None = None, template: str = "base"):
+    def __init__(
+        self, api_key: str | None = None, template: str = "base", timeout: float = 60.0
+    ):
         self.api_key = api_key or os.getenv("E2B_API_KEY")
         self.template = template
+        self.timeout = timeout
         self.sandbox: E2BSandbox | None = None
         self.artifact_manager = ArtifactManager()
 

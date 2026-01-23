@@ -32,12 +32,14 @@ class DockerRuntime(SandboxRuntime):
         cpu_limit: float = 1.0,
         mem_limit: str = "512m",
         allowed_packages: set[str] | None = None,
+        timeout: float = 60.0,
     ):
         self.client = docker.from_env()
         self.image = image
         self.cpu_limit = cpu_limit
         self.mem_limit = mem_limit
         self.allowed_packages = allowed_packages or set()
+        self.timeout = timeout
         self.container: Container | None = None
         self.artifact_manager = ArtifactManager()
         self.work_dir = "/home/sandbox"
@@ -229,14 +231,14 @@ class DockerRuntime(SandboxRuntime):
                 # Offload blocking Docker call to thread and enforce timeout
                 exit_code, output = await asyncio.wait_for(
                     asyncio.to_thread(self.container.exec_run, cmd, demux=True),
-                    timeout=60.0,
+                    timeout=self.timeout,
                 )
             except asyncio.TimeoutError as e:
                 logger.warning(
-                    f"Execution timed out (60s). Restarting container {self.container.short_id} to cleanup process."
+                    f"Execution timed out ({self.timeout}s). Restarting container {self.container.short_id} to cleanup process."
                 )
                 await asyncio.to_thread(self.container.restart)
-                raise TimeoutError("Execution exceeded 60 seconds limit.") from e
+                raise TimeoutError(f"Execution exceeded {self.timeout} seconds limit.") from e
 
             duration = time.time() - start_time
 
