@@ -33,13 +33,15 @@ async def test_execute_python_success(docker_runtime: Any) -> None:
         (0, b""),  # ls after
     ]
 
-    result = await docker_runtime.execute("print('hello')", "python")
+    # Mock time.time() to ensure non-zero duration
+    with patch("coreason_sandbox.runtimes.docker.time.time", side_effect=[1000.0, 1001.5]):
+        result = await docker_runtime.execute("print('hello')", "python")
 
     assert isinstance(result, ExecutionResult)
     assert result.exit_code == 0
     assert result.stdout == "hello\n"
     assert result.stderr == ""
-    assert result.execution_duration > 0
+    assert result.execution_duration == 1.5
 
     # Verify calls
     assert docker_runtime.container.exec_run.call_count == 3
