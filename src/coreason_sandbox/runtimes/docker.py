@@ -33,6 +33,7 @@ class DockerRuntime(SandboxRuntime):
         mem_limit: str = "512m",
         allowed_packages: set[str] | None = None,
         timeout: float = 60.0,
+        artifact_manager: ArtifactManager | None = None,
     ):
         self.client = docker.from_env()
         self.image = image
@@ -41,7 +42,7 @@ class DockerRuntime(SandboxRuntime):
         self.allowed_packages = allowed_packages or set()
         self.timeout = timeout
         self.container: Container | None = None
-        self.artifact_manager = ArtifactManager()
+        self.artifact_manager = artifact_manager or ArtifactManager()
         self.work_dir = "/home/sandbox"
 
     async def start(self) -> None:
