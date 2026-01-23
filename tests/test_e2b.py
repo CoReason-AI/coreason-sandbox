@@ -1,8 +1,7 @@
-from typing import Any, cast
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-from coreason_sandbox.models import ExecutionResult, FileReference
 from coreason_sandbox.runtimes.e2b import E2BRuntime
 
 
@@ -33,7 +32,7 @@ async def test_start_success(mock_e2b_sandbox: Any) -> None:
 async def test_start_failure(mock_e2b_sandbox: Any) -> None:
     mock_e2b_sandbox.side_effect = Exception("Start failed")
     runtime = E2BRuntime(api_key="key")
-    with pytest.raises(Exception):
+    with pytest.raises(Exception, match="Start failed"):
         await runtime.start()
 
 
@@ -135,14 +134,14 @@ async def test_execute_r_success(e2b_runtime: E2BRuntime) -> None:
 @pytest.mark.asyncio
 async def test_execute_unsupported(e2b_runtime: E2BRuntime) -> None:
     with pytest.raises(ValueError):
-        await e2b_runtime.execute("code", "java") # type: ignore
+        await e2b_runtime.execute("code", "java")  # type: ignore
 
 
 @pytest.mark.asyncio
 async def test_execute_exception(e2b_runtime: E2BRuntime) -> None:
     assert e2b_runtime.sandbox is not None
     e2b_runtime.sandbox.run_code.side_effect = Exception("Fail")
-    with pytest.raises(Exception):
+    with pytest.raises(Exception, match="Fail"):
         await e2b_runtime.execute("code", "python")
 
 
@@ -178,7 +177,7 @@ async def test_upload_exception(e2b_runtime: E2BRuntime, tmp_path: Any) -> None:
     assert e2b_runtime.sandbox is not None
     e2b_runtime.sandbox.files.write.side_effect = Exception("Fail")
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception, match="Fail"):
         await e2b_runtime.upload(local_file, "remote.txt")
 
 
@@ -216,7 +215,7 @@ async def test_download_exception(e2b_runtime: E2BRuntime, tmp_path: Any) -> Non
     assert e2b_runtime.sandbox is not None
     e2b_runtime.sandbox.files.read.side_effect = Exception("Fail")
     dest = tmp_path / "downloaded.txt"
-    with pytest.raises(Exception):
+    with pytest.raises(Exception, match="Fail"):
         await e2b_runtime.download("remote.txt", dest)
 
 
@@ -273,7 +272,7 @@ async def test_install_package_success(e2b_runtime: E2BRuntime) -> None:
 async def test_install_package_exception(e2b_runtime: E2BRuntime) -> None:
     assert e2b_runtime.sandbox is not None
     e2b_runtime.sandbox.commands.run.side_effect = Exception("Fail")
-    with pytest.raises(Exception):
+    with pytest.raises(Exception, match="Fail"):
         await e2b_runtime.install_package("requests")
 
 

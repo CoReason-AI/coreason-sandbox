@@ -2,7 +2,7 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-from coreason_sandbox.models import ExecutionResult, FileReference
+from coreason_sandbox.models import ExecutionResult
 from coreason_sandbox.runtimes.docker import DockerRuntime
 
 
@@ -28,9 +28,9 @@ async def test_execute_python_success(docker_runtime: Any) -> None:
     # 2. python code
     # 3. ls (after)
     docker_runtime.container.exec_run.side_effect = [
-        (0, b""), # ls before
-        (0, (b"hello\n", b"")), # python execution
-        (0, b""), # ls after
+        (0, b""),  # ls before
+        (0, (b"hello\n", b"")),  # python execution
+        (0, b""),  # ls after
     ]
 
     result = await docker_runtime.execute("print('hello')", "python")
@@ -51,11 +51,7 @@ async def test_execute_python_success(docker_runtime: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_execute_bash_success(docker_runtime: Any) -> None:
-    docker_runtime.container.exec_run.side_effect = [
-        (0, b""),
-        (0, (b"root\n", b"")),
-        (0, b"")
-    ]
+    docker_runtime.container.exec_run.side_effect = [(0, b""), (0, (b"root\n", b"")), (0, b"")]
 
     result = await docker_runtime.execute("whoami", "bash")
 
@@ -66,11 +62,7 @@ async def test_execute_bash_success(docker_runtime: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_execute_stderr(docker_runtime: Any) -> None:
-    docker_runtime.container.exec_run.side_effect = [
-        (0, b""),
-        (1, (b"", b"error details")),
-        (0, b"")
-    ]
+    docker_runtime.container.exec_run.side_effect = [(0, b""), (1, (b"", b"error details")), (0, b"")]
 
     result = await docker_runtime.execute("invalid", "bash")
 
@@ -94,16 +86,12 @@ async def test_execute_unsupported_language(docker_runtime: Any) -> None:
     docker_runtime.container.exec_run.return_value = (0, b"")
 
     with pytest.raises(ValueError, match="Unsupported language"):
-        await docker_runtime.execute("code", "java")  # type: ignore
+        await docker_runtime.execute("code", "java")
 
 
 @pytest.mark.asyncio
 async def test_execute_r_language(docker_runtime: Any) -> None:
-    docker_runtime.container.exec_run.side_effect = [
-        (0, b""),
-        (0, (b"[1] 4\n", b"")),
-        (0, b"")
-    ]
+    docker_runtime.container.exec_run.side_effect = [(0, b""), (0, (b"[1] 4\n", b"")), (0, b"")]
 
     result = await docker_runtime.execute("2+2", "r")
 
@@ -115,13 +103,11 @@ async def test_execute_r_language(docker_runtime: Any) -> None:
 @pytest.mark.asyncio
 async def test_execute_exception(docker_runtime: Any) -> None:
     from docker.errors import DockerException
-    # Fail on execution step
-    docker_runtime.container.exec_run.side_effect = [
-        (0, b""),
-        DockerException("Fail")
-    ]
 
-    with pytest.raises(Exception): # DockerException
+    # Fail on execution step
+    docker_runtime.container.exec_run.side_effect = [(0, b""), DockerException("Fail")]
+
+    with pytest.raises(DockerException):
         await docker_runtime.execute("code", "python")
 
 
@@ -129,9 +115,9 @@ async def test_execute_exception(docker_runtime: Any) -> None:
 async def test_execute_artifact_handling_failure(docker_runtime: Any) -> None:
     # Simulate success execution but failure in artifact retrieval
     docker_runtime.container.exec_run.side_effect = [
-        (0, b""), # Before ls
-        (0, (b"", b"")), # Exec
-        (0, b"new_file\n"), # After ls
+        (0, b""),  # Before ls
+        (0, (b"", b"")),  # Exec
+        (0, b"new_file\n"),  # After ls
     ]
 
     # Mock download to fail

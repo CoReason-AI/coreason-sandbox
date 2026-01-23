@@ -63,10 +63,12 @@ async def test_download_tar_extraction_exception(docker_runtime: DockerRuntime, 
     # We want to fail inside the `with tarfile.open` block or `tar.next()`
 
     # Mock a tar that is valid but empty (so next() raises StopIteration? No, returns None)
-    import io, tarfile
+    import io
+    import tarfile
+
     tar_stream = io.BytesIO()
-    with tarfile.open(fileobj=tar_stream, mode='w') as tar:
-        pass # Empty tar
+    with tarfile.open(fileobj=tar_stream, mode="w"):
+        pass  # Empty tar
     tar_stream.seek(0)
 
     docker_runtime.container.get_archive.return_value = ([tar_stream.getvalue()], {})
@@ -76,14 +78,17 @@ async def test_download_tar_extraction_exception(docker_runtime: DockerRuntime, 
     with pytest.raises(FileNotFoundError):
         await docker_runtime.download("remote.txt", dest)
 
+
 @pytest.mark.asyncio
 async def test_download_tar_extract_file_none(docker_runtime: DockerRuntime, tmp_path: Any) -> None:
     assert docker_runtime.container is not None
 
     # Mock a tar with a directory member (extractfile returns None)
-    import io, tarfile
+    import io
+    import tarfile
+
     tar_stream = io.BytesIO()
-    with tarfile.open(fileobj=tar_stream, mode='w') as tar:
+    with tarfile.open(fileobj=tar_stream, mode="w") as tar:
         info = tarfile.TarInfo("dir")
         info.type = tarfile.DIRTYPE
         tar.addfile(info)
