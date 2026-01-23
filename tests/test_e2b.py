@@ -102,6 +102,53 @@ async def test_execute_python_artifacts(e2b_runtime: E2BRuntime) -> None:
 
 
 @pytest.mark.asyncio
+async def test_execute_python_filesystem_artifacts(e2b_runtime: E2BRuntime) -> None:
+    """Test detection of filesystem artifacts (e.g. CSV files)."""
+    mock_exec = MagicMock()
+    mock_exec.logs.stdout = []
+    mock_exec.logs.stderr = []
+    mock_exec.error = None
+    mock_exec.results = []
+
+    assert e2b_runtime.sandbox is not None
+    e2b_runtime.sandbox.run_code.return_value = mock_exec
+
+    # Mock list_files to return empty list first, then list with new file
+    entry1 = MagicMock()
+    entry1.name = "existing.txt"
+    entry2 = MagicMock()
+    entry2.name = "new.csv"
+
+    # We need to control the sequence of return values for list_files
+    # But list_files is an async wrapper or sync? In e2b_runtime it's async wrapper calling sandbox.files.list
+    # sandbox.files.list is synchronous in the SDK usually, but let's check wrapper.
+    # e2b_runtime.list_files uses sandbox.files.list(path).
+
+    # We need to verify how we can mock 'before' and 'after' calls.
+    # If the implementation calls self.list_files("."), we can mock that method on the instance?
+    # Or mock sandbox.files.list side_effect.
+
+    e2b_runtime.sandbox.files.list.side_effect = [
+        [entry1],  # Before
+        [entry1, entry2],  # After
+    ]
+
+    # Mock download
+    e2b_runtime.sandbox.files.read.return_value = b"csv_content"
+
+    # We expect the implementation to call list_files before and after
+    # And then download the new file
+
+    result = await e2b_runtime.execute("create_csv()", "python")
+
+    assert len(result.artifacts) == 1
+    assert result.artifacts[0].filename == "new.csv"
+    assert result.artifacts[0].content_type == "text/csv"  # inferred from extension
+    # Verify download called
+    e2b_runtime.sandbox.files.read.assert_called_with("new.csv")
+
+
+@pytest.mark.asyncio
 async def test_execute_bash_success(e2b_runtime: E2BRuntime) -> None:
     mock_cmd = MagicMock()
     mock_cmd.stdout = "root"
@@ -301,6 +348,55 @@ async def test_list_files_exception(e2b_runtime: E2BRuntime) -> None:
 
     files = await e2b_runtime.list_files(".")
     assert files == []
+
+
+@pytest.mark.asyncio
+async def test_list_files_internal_exception(e2b_runtime: E2BRuntime) -> None:
+    # Test _list_files_internal handles exceptions
+    assert e2b_runtime.sandbox is not None
+    e2b_runtime.sandbox.files.list.side_effect = Exception("Fail")
+
+    # We call _list_files_internal directly to verify it returns empty set
+    # Note: access private method for testing
+    files = await e2b_runtime._list_files_internal(".")
+    assert files == set()
+
+
+@pytest.mark.asyncio
+async def test_list_files_internal_no_sandbox() -> None:
+    # Test _list_files_internal when sandbox not started (raises RuntimeError)
+    runtime = E2BRuntime()
+    files = await runtime._list_files_internal(".")
+    assert files == set()
+
+
+@pytest.mark.asyncio
+async def test_execute_python_artifact_retrieval_exception(e2b_runtime: E2BRuntime) -> None:
+    """Test handling of artifact retrieval failure."""
+    mock_exec = MagicMock()
+    mock_exec.logs.stdout = []
+    mock_exec.logs.stderr = []
+    mock_exec.error = None
+    mock_exec.results = []
+
+    assert e2b_runtime.sandbox is not None
+    e2b_runtime.sandbox.run_code.return_value = mock_exec
+
+    entry1 = MagicMock()
+    entry1.name = "new.csv"
+    e2b_runtime.sandbox.files.list.side_effect = [
+        [],  # Before
+        [entry1],  # After
+    ]
+
+    # Mock download failure
+    e2b_runtime.sandbox.files.read.side_effect = Exception("Download Fail")
+
+    result = await e2b_runtime.execute("create()", "python")
+
+    # Should not fail, just skip artifact
+    assert len(result.artifacts) == 0
+    assert result.exit_code == 0
 
 
 @pytest.mark.asyncio
