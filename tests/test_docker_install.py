@@ -78,6 +78,7 @@ def test_download_and_package_mac_x86(docker_runtime: Any) -> None:
         assert "manylinux2014_x86_64" in args
         assert "--python-version" in args
 
+
 def test_download_and_package_mac_arm(docker_runtime: Any) -> None:
     """Test the synchronous helper method logic on Mac (non-Linux) ARM."""
     with (
@@ -93,6 +94,7 @@ def test_download_and_package_mac_arm(docker_runtime: Any) -> None:
         assert "--platform" in args
         assert "manylinux2014_aarch64" in args
         assert "--python-version" in args
+
 
 def test_download_and_package_fail(docker_runtime: Any) -> None:
     with (
@@ -127,6 +129,7 @@ async def test_install_package_download_exception(docker_runtime: Any) -> None:
         with pytest.raises(RuntimeError, match="Download failed"):
             await docker_runtime.install_package("requests")
 
+
 @pytest.mark.asyncio
 async def test_install_package_install_fail(docker_runtime: Any) -> None:
     with patch.object(docker_runtime, "_download_and_package", return_value=b"tarbytes"):
@@ -137,6 +140,7 @@ async def test_install_package_install_fail(docker_runtime: Any) -> None:
 
         with pytest.raises(RuntimeError, match="Failed to install package"):
             await docker_runtime.install_package("requests")
+
 
 @pytest.mark.asyncio
 async def test_install_package_with_version(docker_runtime: Any) -> None:
@@ -150,6 +154,7 @@ async def test_install_package_with_version(docker_runtime: Any) -> None:
         # Verify download called with full string
         mock_download.assert_called_once_with("requests==2.31.0")
 
+
 @pytest.mark.asyncio
 async def test_install_package_case_insensitive(docker_runtime: Any) -> None:
     """Test that package name checking is case insensitive."""
@@ -160,6 +165,7 @@ async def test_install_package_case_insensitive(docker_runtime: Any) -> None:
         await docker_runtime.install_package("Requests")
 
         mock_download.assert_called_once_with("Requests")
+
 
 @pytest.mark.asyncio
 async def test_install_package_complex_specifiers(docker_runtime: Any) -> None:
