@@ -404,3 +404,83 @@ async def test_list_files_no_sandbox() -> None:
     runtime = E2BRuntime()
     with pytest.raises(RuntimeError):
         await runtime.list_files(".")
+
+
+@pytest.mark.asyncio
+async def test_execute_python_multiple_artifacts_with_spaces(e2b_runtime: E2BRuntime) -> None:
+    """Test detection of multiple files, including those with spaces."""
+    mock_exec = MagicMock()
+    mock_exec.logs.stdout = []
+    mock_exec.logs.stderr = []
+    mock_exec.error = None
+    mock_exec.results = []
+
+    assert e2b_runtime.sandbox is not None
+    e2b_runtime.sandbox.run_code.return_value = mock_exec
+
+    # Files
+    entry1 = MagicMock()
+    entry1.name = "data.csv"
+    entry2 = MagicMock()
+    entry2.name = "my chart.png"
+    entry3 = MagicMock()
+    entry3.name = "notes.txt"
+
+    e2b_runtime.sandbox.files.list.side_effect = [
+        [],  # Before
+        [entry1, entry2, entry3],  # After
+    ]
+
+    # Mock download (return distinct content to verify mapping)
+    def side_effect_read(path: str) -> bytes | None:
+        if path == "data.csv":
+            return b"csv"
+        if path == "my chart.png":
+            return b"png"
+        if path == "notes.txt":
+            return b"notes"
+        return None
+
+    e2b_runtime.sandbox.files.read.side_effect = side_effect_read
+
+    result = await e2b_runtime.execute("create_multiple()", "python")
+
+    assert len(result.artifacts) == 3
+    filenames = {a.filename for a in result.artifacts}
+    assert filenames == {"data.csv", "my chart.png", "notes.txt"}
+
+
+@pytest.mark.asyncio
+async def test_execute_file_deletion_and_modification(e2b_runtime: E2BRuntime) -> None:
+    """Verify that deleted or modified files are NOT flagged as new artifacts."""
+    mock_exec = MagicMock()
+    mock_exec.logs.stdout = []
+    mock_exec.logs.stderr = []
+    mock_exec.error = None
+    mock_exec.results = []
+
+    assert e2b_runtime.sandbox is not None
+    e2b_runtime.sandbox.run_code.return_value = mock_exec
+
+    # Files
+    entry_existing = MagicMock()
+    entry_existing.name = "config.json"
+    entry_modified = MagicMock()
+    entry_modified.name = "data.csv"
+
+    # Before: config.json exists, data.csv exists
+    # After: config.json deleted, data.csv modified (still exists), new.txt created
+
+    e2b_runtime.sandbox.files.list.side_effect = [
+        [entry_existing, entry_modified],  # Before
+        [entry_modified],  # After (config.json gone)
+    ]
+
+    # Mock download
+    e2b_runtime.sandbox.files.read.return_value = b"content"
+
+    result = await e2b_runtime.execute("delete_and_modify()", "python")
+
+    # new_files = {data.csv} - {config.json, data.csv} = {}
+    # So no artifacts should be detected (modification not detected by name diff)
+    assert len(result.artifacts) == 0
