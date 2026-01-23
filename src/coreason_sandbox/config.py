@@ -17,6 +17,7 @@ class SandboxConfig(BaseSettings):
         "scikit-learn",
         "scipy",
     }
+    execution_timeout: float = 60.0
 
     model_config = SettingsConfigDict(
         env_prefix="COREASON_SANDBOX_",
