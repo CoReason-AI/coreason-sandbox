@@ -1,4 +1,5 @@
 import os
+import tempfile
 import time
 from pathlib import Path
 from typing import Literal
@@ -9,6 +10,7 @@ from loguru import logger
 
 from coreason_sandbox.models import ExecutionResult, FileReference
 from coreason_sandbox.runtime import SandboxRuntime
+from coreason_sandbox.utils.artifacts import ArtifactManager
 
 
 class E2BRuntime(SandboxRuntime):
@@ -20,6 +22,7 @@ class E2BRuntime(SandboxRuntime):
         self.api_key = api_key or os.getenv("E2B_API_KEY")
         self.template = template
         self.sandbox: E2BSandbox | None = None
+        self.artifact_manager = ArtifactManager()
 
     async def start(self) -> None:
         """
@@ -69,6 +72,14 @@ class E2BRuntime(SandboxRuntime):
             logger.error(f"Failed to list files: {e}")
             return []
 
+    async def _list_files_internal(self, path: str) -> set[str]:
+        """Helper to list files for artifact detection."""
+        try:
+            files = await self.list_files(path)
+            return set(files)
+        except Exception:
+            return set()
+
     async def execute(self, code: str, language: Literal["python", "bash", "r"]) -> ExecutionResult:
         """
         Run script and capture output.
@@ -77,6 +88,9 @@ class E2BRuntime(SandboxRuntime):
             raise RuntimeError("Sandbox not started")
 
         logger.info(f"Executing {language} code in E2B sandbox")
+
+        # Filesystem artifact detection: Snapshot before
+        files_before = await self._list_files_internal(".")
 
         start_time = time.time()
         try:
@@ -93,6 +107,7 @@ class E2BRuntime(SandboxRuntime):
                     exit_code = 0
 
                 artifacts = []
+                # 1. Native E2B artifacts (PNGs)
                 for result in execution.results:
                     if hasattr(result, "png") and result.png:
                         artifacts.append(
@@ -124,6 +139,23 @@ class E2BRuntime(SandboxRuntime):
                 raise ValueError(f"Unsupported language: {language}")
 
             duration = time.time() - start_time
+
+            # Filesystem artifact detection: Snapshot after
+            files_after = await self._list_files_internal(".")
+            new_files = files_after - files_before
+
+            if new_files:
+                with tempfile.TemporaryDirectory() as tmp_dir_str:
+                    tmp_dir = Path(tmp_dir_str)
+                    for filename in new_files:
+                        remote_path = filename
+                        local_path = tmp_dir / filename
+                        try:
+                            await self.download(remote_path, local_path)
+                            ref = self.artifact_manager.process_file(local_path, filename)
+                            artifacts.append(ref)
+                        except Exception as e:
+                            logger.warning(f"Failed to retrieve artifact {filename}: {e}")
 
             return ExecutionResult(
                 stdout=stdout,
