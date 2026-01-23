@@ -53,6 +53,15 @@ class MockRuntime(SandboxRuntime):
         if remote_path not in self.files:
             raise FileNotFoundError(f"File {remote_path} not found")
 
+    async def install_package(self, package_name: str) -> None:
+        if not self.is_running:
+            raise RuntimeError("Runtime not started")
+
+    async def list_files(self, path: str) -> list[str]:
+        if not self.is_running:
+            raise RuntimeError("Runtime not started")
+        return list(self.files)
+
     async def terminate(self) -> None:
         self.is_running = False
         self.files.clear()
