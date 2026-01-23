@@ -50,6 +50,20 @@ class SandboxRuntime(ABC):
         pass  # pragma: no cover
 
     @abstractmethod
+    async def install_package(self, package_name: str) -> None:
+        """
+        Install a package dependency.
+        """
+        pass  # pragma: no cover
+
+    @abstractmethod
+    async def list_files(self, path: str) -> list[str]:
+        """
+        List files in the directory.
+        """
+        pass  # pragma: no cover
+
+    @abstractmethod
     async def terminate(self) -> None:
         """
         Kill and cleanup the sandbox environment.
