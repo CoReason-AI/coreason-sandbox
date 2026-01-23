@@ -235,7 +235,8 @@ class DockerRuntime(SandboxRuntime):
                 )
             except asyncio.TimeoutError as e:
                 logger.warning(
-                    f"Execution timed out ({self.timeout}s). Restarting container {self.container.short_id} to cleanup process."
+                    f"Execution timed out ({self.timeout}s). "
+                    f"Restarting container {self.container.short_id} to cleanup process."
                 )
                 await asyncio.to_thread(self.container.restart)
                 raise TimeoutError(f"Execution exceeded {self.timeout} seconds limit.") from e
