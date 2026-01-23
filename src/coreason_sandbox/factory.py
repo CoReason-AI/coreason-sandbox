@@ -15,7 +15,7 @@ class SandboxFactory:
         Returns an instance of the configured SandboxRuntime.
         """
         if config.runtime == "docker":
-            return DockerRuntime()
+            return DockerRuntime(allowed_packages=config.allowed_packages)
         elif config.runtime == "e2b":
             return E2BRuntime()
         else:

@@ -9,6 +9,14 @@ class SandboxConfig(BaseSettings):
     """
 
     runtime: Literal["docker", "e2b"] = "docker"
+    allowed_packages: set[str] = {
+        "pandas",
+        "numpy",
+        "matplotlib",
+        "seaborn",
+        "scikit-learn",
+        "scipy",
+    }
 
     model_config = SettingsConfigDict(
         env_prefix="COREASON_SANDBOX_",
