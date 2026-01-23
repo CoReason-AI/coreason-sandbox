@@ -2,6 +2,7 @@ import asyncio
 import io
 import os
 import platform
+import re
 import subprocess
 import sys
 import tarfile
@@ -161,8 +162,15 @@ class DockerRuntime(SandboxRuntime):
         if not self.container:
             raise RuntimeError("Sandbox not started")
 
-        if package_name not in self.allowed_packages:
-            raise ValueError(f"Package {package_name} is not in the allowed list.")
+        # Parse package name to remove version specifiers (e.g., pandas==2.0 -> pandas)
+        # Regex to split on common version specifiers: ==, >=, <=, >, <, ~=, ;, @
+        base_package_name = re.split(r"[=<>]|~|;|@", package_name)[0].strip().lower()
+
+        # Normalize allowlist to lowercase for check
+        allowed_lower = {p.lower() for p in self.allowed_packages}
+
+        if base_package_name not in allowed_lower:
+            raise ValueError(f"Package {package_name} (base: {base_package_name}) is not in the allowed list.")
 
         logger.info(f"Installing package {package_name} via host proxy")
 

@@ -137,3 +137,37 @@ async def test_install_package_install_fail(docker_runtime: Any) -> None:
 
         with pytest.raises(RuntimeError, match="Failed to install package"):
             await docker_runtime.install_package("requests")
+
+@pytest.mark.asyncio
+async def test_install_package_with_version(docker_runtime: Any) -> None:
+    """Test that installing a package with version specifier works if base name is allowed."""
+    with patch.object(docker_runtime, "_download_and_package", return_value=b"tarbytes") as mock_download:
+        docker_runtime.container.exec_run.side_effect = [(0, b""), (0, b"Success")]
+
+        # "requests" is in allowlist
+        await docker_runtime.install_package("requests==2.31.0")
+
+        # Verify download called with full string
+        mock_download.assert_called_once_with("requests==2.31.0")
+
+@pytest.mark.asyncio
+async def test_install_package_case_insensitive(docker_runtime: Any) -> None:
+    """Test that package name checking is case insensitive."""
+    with patch.object(docker_runtime, "_download_and_package", return_value=b"tarbytes") as mock_download:
+        docker_runtime.container.exec_run.side_effect = [(0, b""), (0, b"Success")]
+
+        # "Requests" should match "requests" in allowlist
+        await docker_runtime.install_package("Requests")
+
+        mock_download.assert_called_once_with("Requests")
+
+@pytest.mark.asyncio
+async def test_install_package_complex_specifiers(docker_runtime: Any) -> None:
+    """Test parsing of complex version specifiers."""
+    with patch.object(docker_runtime, "_download_and_package", return_value=b"tarbytes") as mock_download:
+        docker_runtime.container.exec_run.side_effect = [(0, b""), (0, b"Success")]
+
+        # "pandas" is in allowlist
+        await docker_runtime.install_package("pandas>=1.0,<2.0")
+
+        mock_download.assert_called_once_with("pandas>=1.0,<2.0")
