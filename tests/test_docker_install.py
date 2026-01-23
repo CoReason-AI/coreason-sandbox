@@ -62,8 +62,8 @@ def test_download_and_package_linux(docker_runtime: Any) -> None:
         assert "--platform" not in args  # Should not add platform flags on Linux
 
 
-def test_download_and_package_mac(docker_runtime: Any) -> None:
-    """Test the synchronous helper method logic on Mac (non-Linux)."""
+def test_download_and_package_mac_x86(docker_runtime: Any) -> None:
+    """Test the synchronous helper method logic on Mac (non-Linux) x86_64."""
     with (
         patch("coreason_sandbox.runtimes.docker.subprocess.run") as mock_subprocess,
         patch("coreason_sandbox.runtimes.docker.tarfile.open"),
@@ -78,6 +78,21 @@ def test_download_and_package_mac(docker_runtime: Any) -> None:
         assert "manylinux2014_x86_64" in args
         assert "--python-version" in args
 
+def test_download_and_package_mac_arm(docker_runtime: Any) -> None:
+    """Test the synchronous helper method logic on Mac (non-Linux) ARM."""
+    with (
+        patch("coreason_sandbox.runtimes.docker.subprocess.run") as mock_subprocess,
+        patch("coreason_sandbox.runtimes.docker.tarfile.open"),
+        patch("platform.system", return_value="Darwin"),
+        patch("platform.machine", return_value="arm64"),
+    ):
+        docker_runtime._download_and_package("requests")
+
+        mock_subprocess.assert_called_once()
+        args = mock_subprocess.call_args[0][0]
+        assert "--platform" in args
+        assert "manylinux2014_aarch64" in args
+        assert "--python-version" in args
 
 def test_download_and_package_fail(docker_runtime: Any) -> None:
     with (
@@ -103,6 +118,14 @@ async def test_install_package_not_started(mock_docker_client: Any) -> None:
     with pytest.raises(RuntimeError, match="Sandbox not started"):
         await runtime.install_package("requests")
 
+
+@pytest.mark.asyncio
+async def test_install_package_download_exception(docker_runtime: Any) -> None:
+    """Test that runtime errors during download are propagated correctly."""
+    # Simulate an error in the threaded function
+    with patch.object(docker_runtime, "_download_and_package", side_effect=RuntimeError("Download failed")):
+        with pytest.raises(RuntimeError, match="Download failed"):
+            await docker_runtime.install_package("requests")
 
 @pytest.mark.asyncio
 async def test_install_package_install_fail(docker_runtime: Any) -> None:
