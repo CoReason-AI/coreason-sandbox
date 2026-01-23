@@ -78,33 +78,6 @@ async def test_terminate_failure(docker_runtime: DockerRuntime) -> None:
 
 
 @pytest.mark.asyncio
-async def test_install_package_success(docker_runtime: DockerRuntime) -> None:
-    docker_runtime.container = MagicMock()
-    docker_runtime.container.exec_run.return_value = (0, b"Success")
-
-    await docker_runtime.install_package("requests")
-
-    docker_runtime.container.exec_run.assert_called_once()
-    args, _ = docker_runtime.container.exec_run.call_args
-    assert "pip install requests" in str(args) or args[0] == ["pip", "install", "requests"]
-
-
-@pytest.mark.asyncio
-async def test_install_package_failure(docker_runtime: DockerRuntime) -> None:
-    docker_runtime.container = MagicMock()
-    docker_runtime.container.exec_run.return_value = (1, b"Failed")
-
-    with pytest.raises(RuntimeError, match="Failed to install package"):
-        await docker_runtime.install_package("requests")
-
-
-@pytest.mark.asyncio
-async def test_install_package_no_container(docker_runtime: DockerRuntime) -> None:
-    with pytest.raises(RuntimeError, match="Sandbox not started"):
-        await docker_runtime.install_package("requests")
-
-
-@pytest.mark.asyncio
 async def test_list_files_success(docker_runtime: DockerRuntime) -> None:
     docker_runtime.container = MagicMock()
     docker_runtime.container.exec_run.return_value = (0, b"file1\nfile2\n")

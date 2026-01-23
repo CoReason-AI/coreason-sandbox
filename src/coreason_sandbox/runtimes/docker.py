@@ -1,5 +1,10 @@
+import asyncio
 import io
 import os
+import platform
+import re
+import subprocess
+import sys
 import tarfile
 import tempfile
 import time
@@ -21,11 +26,18 @@ class DockerRuntime(SandboxRuntime):
     Docker-based implementation of the SandboxRuntime.
     """
 
-    def __init__(self, image: str = "python:3.12-slim", cpu_limit: float = 1.0, mem_limit: str = "512m"):
+    def __init__(
+        self,
+        image: str = "python:3.12-slim",
+        cpu_limit: float = 1.0,
+        mem_limit: str = "512m",
+        allowed_packages: set[str] | None = None,
+    ):
         self.client = docker.from_env()
         self.image = image
         self.cpu_limit = cpu_limit
         self.mem_limit = mem_limit
+        self.allowed_packages = allowed_packages or set()
         self.container: Container | None = None
         self.artifact_manager = ArtifactManager()
         self.work_dir = "/home/sandbox"
@@ -84,6 +96,65 @@ class DockerRuntime(SandboxRuntime):
         files = output.decode("utf-8").splitlines()
         return [f.strip() for f in files if f.strip()]
 
+    def _download_and_package(self, package_name: str) -> bytes:
+        """
+        Download package wheels and package them into a tar stream.
+        Runs synchronously (CPU/IO bound).
+        """
+        with tempfile.TemporaryDirectory() as temp_dir_str:
+            temp_dir = Path(temp_dir_str)
+            cmd = [
+                sys.executable,
+                "-m",
+                "pip",
+                "download",
+                package_name,
+                "--dest",
+                str(temp_dir),
+                "--only-binary=:all:",
+            ]
+
+            # Handle cross-platform: if host is not Linux, force Linux wheels
+            if platform.system().lower() != "linux":
+                # Assuming container is standard linux (manylinux)
+                # Detect arch
+                machine = platform.machine().lower()
+                if "arm" in machine or "aarch64" in machine:
+                    plat = "manylinux2014_aarch64"
+                else:
+                    plat = "manylinux2014_x86_64"
+
+                cmd.extend(
+                    [
+                        "--platform",
+                        plat,
+                        "--python-version",
+                        "3.12",
+                        "--implementation",
+                        "cp",
+                        "--abi",
+                        "cp312",
+                    ]
+                )
+
+            try:
+                subprocess.run(
+                    cmd,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Failed to download package {package_name} on host: {e.stderr}")
+                raise RuntimeError(f"Failed to download package {package_name}: {e.stderr}") from e
+
+            # Tar the directory
+            tar_stream = io.BytesIO()
+            with tarfile.open(fileobj=tar_stream, mode="w") as tar:
+                tar.add(temp_dir, arcname=".")
+            tar_stream.seek(0)
+            return tar_stream.getvalue()
+
     async def install_package(self, package_name: str) -> None:
         """
         Install a package dependency (pip only).
@@ -91,28 +162,43 @@ class DockerRuntime(SandboxRuntime):
         if not self.container:
             raise RuntimeError("Sandbox not started")
 
-        logger.info(f"Installing package {package_name}")
-        # Assuming network_mode="none" is default, pip install will fail unless we allow it or pre-install.
-        # PRD: "Docker: network_mode='none' by default. If external packages are needed,
-        # a strict allowlist (PyPI only) must be enforced."
-        # If network is none, we can't install.
-        # But if the user asks to install, maybe we should assume network is available
-        # OR we are in a mode that allows it?
-        # Or maybe the "none" is only for execution, but we temporarily enable it?
-        # Docker run network cannot be changed easily without restart?
-        # Actually `docker run --network none` prevents access.
-        # If we need to install, we might need a proxy or pre-baked image.
-        # FOR NOW: I will attempt `pip install` but if network is none it will fail.
-        # I'll assume for the AUC that the environment allows it (maybe local dev mode has net).
+        # Parse package name to remove version specifiers (e.g., pandas==2.0 -> pandas)
+        # Regex to split on common version specifiers: ==, >=, <=, >, <, ~=, ;, @
+        base_package_name = re.split(r"[=<>]|~|;|@", package_name)[0].strip().lower()
 
-        # Security check: Allowlist logic would go here.
-        # validate_package(package_name)
+        # Normalize allowlist to lowercase for check
+        allowed_lower = {p.lower() for p in self.allowed_packages}
 
-        cmd = ["pip", "install", package_name]
+        if base_package_name not in allowed_lower:
+            raise ValueError(f"Package {package_name} (base: {base_package_name}) is not in the allowed list.")
+
+        logger.info(f"Installing package {package_name} via host proxy")
+
+        # 1. Download & Package (Offload to thread)
+        try:
+            tar_bytes = await asyncio.to_thread(self._download_and_package, package_name)
+        except RuntimeError as e:
+            raise e
+
+        # 2. Upload wheels to container
+        remote_pkg_dir = f"/tmp/packages/{package_name}"
+        self.container.exec_run(f"mkdir -p {remote_pkg_dir}")
+
+        self.container.put_archive(path=remote_pkg_dir, data=tar_bytes)
+
+        # 3. Install offline
+        cmd = [
+            "pip",
+            "install",
+            "--no-index",
+            "--find-links",
+            remote_pkg_dir,
+            package_name,
+        ]
         exit_code, output = self.container.exec_run(cmd)
         if exit_code != 0:
             msg = output.decode("utf-8")
-            logger.error(f"Failed to install {package_name}: {msg}")
+            logger.error(f"Failed to install {package_name} in container: {msg}")
             raise RuntimeError(f"Failed to install package: {msg}")
 
     async def execute(self, code: str, language: Literal["python", "bash", "r"]) -> ExecutionResult:
