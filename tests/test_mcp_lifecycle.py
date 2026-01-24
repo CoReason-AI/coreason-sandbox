@@ -26,6 +26,14 @@ def mock_factory(mock_runtime: Any) -> Any:
         yield mock
 
 
+@pytest.fixture(autouse=True)
+def mock_veritas() -> Any:
+    """Mock VeritasIntegrator to prevent OTLP connection errors during tests."""
+    with patch("coreason_sandbox.mcp.VeritasIntegrator") as mock:
+        mock.return_value.log_pre_execution = AsyncMock()
+        yield mock
+
+
 @pytest.mark.asyncio
 async def test_session_creation_and_reuse(mock_factory: Any, mock_runtime: Any) -> None:
     mcp = SandboxMCP()
