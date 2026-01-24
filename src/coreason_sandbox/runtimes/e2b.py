@@ -117,10 +117,7 @@ class E2BRuntime(SandboxRuntime):
                         timeout=self.timeout,
                     )
                 except asyncio.TimeoutError as e:
-                    logger.warning(
-                        f"Execution timed out ({self.timeout}s). "
-                        f"Restarting sandbox to cleanup process."
-                    )
+                    logger.warning(f"Execution timed out ({self.timeout}s). " f"Restarting sandbox to cleanup process.")
                     await self.terminate()
                     await self.start()
                     raise TimeoutError(f"Execution exceeded {self.timeout} seconds limit.") from e
@@ -156,10 +153,7 @@ class E2BRuntime(SandboxRuntime):
                         timeout=self.timeout,
                     )
                 except asyncio.TimeoutError as e:
-                    logger.warning(
-                        f"Execution timed out ({self.timeout}s). "
-                        f"Restarting sandbox to cleanup process."
-                    )
+                    logger.warning(f"Execution timed out ({self.timeout}s). " f"Restarting sandbox to cleanup process.")
                     await self.terminate()
                     await self.start()
                     raise TimeoutError(f"Execution exceeded {self.timeout} seconds limit.") from e
@@ -176,10 +170,7 @@ class E2BRuntime(SandboxRuntime):
                         timeout=self.timeout,
                     )
                 except asyncio.TimeoutError as e:
-                    logger.warning(
-                        f"Execution timed out ({self.timeout}s). "
-                        f"Restarting sandbox to cleanup process."
-                    )
+                    logger.warning(f"Execution timed out ({self.timeout}s). " f"Restarting sandbox to cleanup process.")
                     await self.terminate()
                     await self.start()
                     raise TimeoutError(f"Execution exceeded {self.timeout} seconds limit.") from e

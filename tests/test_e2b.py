@@ -1,7 +1,7 @@
+import asyncio
+import time
 from typing import Any
 from unittest.mock import MagicMock, patch
-import time
-import asyncio
 
 import pytest
 from coreason_sandbox.runtimes.e2b import E2BRuntime
@@ -600,22 +600,12 @@ async def test_execute_error_persistence(e2b_runtime: E2BRuntime) -> None:
 async def test_concurrent_terminate_during_execute(e2b_runtime: E2BRuntime) -> None:
     """Simulate terminate being called while execute is waiting."""
     assert e2b_runtime.sandbox is not None
-    original_sandbox = e2b_runtime.sandbox
 
-    # Make run_code sleep to simulate long task
-    async def delayed_run_code(*args: Any, **kwargs: Any) -> Any:
-        await asyncio.sleep(0.2)
+    def side_effect(*args: Any, **kwargs: Any) -> MagicMock:
+        time.sleep(0.2)
         return MagicMock(logs=MagicMock(stdout=[], stderr=[]), error=None, results=[])
 
-    # We mock asyncio.to_thread in execute to call our async sleeper
-    # But execute uses asyncio.to_thread(self.sandbox.run_code, ...)
-    # which runs strictly in a thread.
-    # To simulate this test deterministically without real threads,
-    # we can just run execute and terminate concurrently.
-
-    e2b_runtime.sandbox.run_code.side_effect = lambda x: time.sleep(0.2) or MagicMock(
-        logs=MagicMock(stdout=[], stderr=[]), error=None, results=[]
-    )
+    e2b_runtime.sandbox.run_code.side_effect = side_effect
 
     # Start execute task
     exec_task = asyncio.create_task(e2b_runtime.execute("sleep", "python"))
@@ -624,12 +614,7 @@ async def test_concurrent_terminate_during_execute(e2b_runtime: E2BRuntime) -> N
     await asyncio.sleep(0.05)
     await e2b_runtime.terminate()
 
-    # execute should finish (or fail if we mocked close to break run_code, but here it finishes)
-    # The main point is that no crash occurs and sandbox is None at end
     result = await exec_task
 
     assert e2b_runtime.sandbox is None
-    # Result might be success here because mock run_code finished successfully
-    # In real world, close() might cause run_code to throw, which execute would catch and re-raise.
-    # We validated that flow in other tests. Here we validate concurrency safety.
     assert result.exit_code == 0
