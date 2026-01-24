@@ -70,6 +70,12 @@ async def execute_code(
             # Parse data URL: data:image/png;base64,....
             try:
                 header, base64_data = url.split(",", 1)
+
+                # Validate base64
+                import base64
+
+                base64.b64decode(base64_data, validate=True)
+
                 # header e.g. "data:image/png;base64"
                 # content_type from artifact or parsed from header
 
