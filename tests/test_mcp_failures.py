@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from coreason_sandbox.mcp import SandboxMCP
 
-
 @pytest.fixture
 def mock_runtime() -> Any:
     runtime = AsyncMock()
@@ -15,20 +14,10 @@ def mock_runtime() -> Any:
     runtime.execute.return_value.artifacts = []
     return runtime
 
-
 @pytest.fixture
 def mock_factory(mock_runtime: Any) -> Any:
     with patch("coreason_sandbox.mcp.SandboxFactory.get_runtime", return_value=mock_runtime) as mock:
         yield mock
-
-
-@pytest.fixture(autouse=True)
-def mock_veritas() -> Any:
-    """Mock VeritasIntegrator to prevent OTLP connection errors during tests."""
-    with patch("coreason_sandbox.mcp.VeritasIntegrator") as mock:
-        mock.return_value.log_pre_execution = AsyncMock()
-        yield mock
-
 
 @pytest.mark.asyncio
 async def test_reaper_exception_handling(mock_factory: Any, mock_runtime: Any) -> None:
@@ -41,7 +30,6 @@ async def test_reaper_exception_handling(mock_factory: Any, mock_runtime: Any) -
         assert mcp._reaper_task is not None
         await mcp._reaper_task
         assert mcp._reaper_task.done()
-
 
 @pytest.mark.asyncio
 async def test_reaper_cancellation_coverage(mock_factory: Any, mock_runtime: Any) -> None:
@@ -62,6 +50,8 @@ async def test_reaper_cancellation_coverage(mock_factory: Any, mock_runtime: Any
 
     assert mcp._reaper_task.done()
 
+    # Yield control to ensure async cleanup happens and coverage is flushed
+    await asyncio.sleep(0.1)
 
 @pytest.mark.asyncio
 async def test_shutdown_terminate_exception(mock_factory: Any, mock_runtime: Any) -> None:
@@ -73,9 +63,6 @@ async def test_shutdown_terminate_exception(mock_factory: Any, mock_runtime: Any
     assert "sess_fail" in mcp.sessions
 
     # Mock terminate to raise exception
-    # Important: The session stores the runtime instance.
-    # mock_factory returns mock_runtime, so the session has mock_runtime.
-    # We configure that specific instance to fail.
     mock_runtime.terminate.side_effect = Exception("Terminator Failed")
 
     # Should not raise exception, but log it
