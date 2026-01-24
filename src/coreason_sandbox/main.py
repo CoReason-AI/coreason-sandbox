@@ -8,7 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_sandbox
 
-from typing import Literal
+from typing import Any, Literal, cast
 
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ImageContent, TextContent
@@ -22,7 +22,7 @@ sandbox = SandboxMCP()
 mcp = FastMCP("coreason-sandbox")
 
 
-@mcp.tool()
+@mcp.tool()  # type: ignore[misc]
 async def execute_code(
     session_id: str, language: Literal["python", "bash", "r"], code: str
 ) -> list[TextContent | ImageContent]:
@@ -38,31 +38,33 @@ async def execute_code(
 
     output: list[TextContent | ImageContent] = []
 
+    # Safe casting for mypy, as we know the structure from SandboxMCP
+    stdout = cast(str, result.get("stdout", ""))
+    stderr = cast(str, result.get("stderr", ""))
+    exit_code = cast(int, result.get("exit_code", 0))
+    execution_duration = cast(float, result.get("execution_duration", 0.0))
+    artifacts = cast(list[dict[str, Any]], result.get("artifacts", []))
+
     # Stdout
-    if result.get("stdout"):
-        output.append(TextContent(type="text", text=f"STDOUT:\n{result['stdout']}"))
+    if stdout:
+        output.append(TextContent(type="text", text=f"STDOUT:\n{stdout}"))
 
     # Stderr
-    if result.get("stderr"):
-        output.append(TextContent(type="text", text=f"STDERR:\n{result['stderr']}"))
+    if stderr:
+        output.append(TextContent(type="text", text=f"STDERR:\n{stderr}"))
 
     # Exit Code
-    output.append(TextContent(type="text", text=f"Exit Code: {result['exit_code']}"))
+    output.append(TextContent(type="text", text=f"Exit Code: {exit_code}"))
 
     # Duration
-    if result.get("execution_duration"):
-        output.append(
-            TextContent(
-                type="text", text=f"Duration: {result['execution_duration']:.4f}s"
-            )
-        )
+    if execution_duration:
+        output.append(TextContent(type="text", text=f"Duration: {execution_duration:.4f}s"))
 
     # Artifacts
-    artifacts = result.get("artifacts", [])  # type: ignore
     for artifact in artifacts:
-        url = artifact.get("url")
-        filename = artifact.get("filename")
-        content_type = artifact.get("content_type", "application/octet-stream")
+        url = cast(str | None, artifact.get("url"))
+        filename = cast(str, artifact.get("filename", "unknown"))
+        content_type = cast(str, artifact.get("content_type", "application/octet-stream"))
 
         if url and url.startswith("data:image/"):
             # Parse data URL: data:image/png;base64,....
@@ -77,9 +79,7 @@ async def execute_code(
                 else:
                     mime = content_type
 
-                output.append(
-                    ImageContent(type="image", data=base64_data, mimeType=mime)
-                )
+                output.append(ImageContent(type="image", data=base64_data, mimeType=mime))
             except Exception as e:
                 output.append(
                     TextContent(
@@ -98,7 +98,7 @@ async def execute_code(
     return output
 
 
-@mcp.tool()
+@mcp.tool()  # type: ignore[misc]
 async def install_package(session_id: str, package_name: str) -> str:
     """
     Install a package in the sandbox session.
@@ -109,7 +109,7 @@ async def install_package(session_id: str, package_name: str) -> str:
         return f"Error installing package: {e!s}"
 
 
-@mcp.tool()
+@mcp.tool()  # type: ignore[misc]
 async def list_files(session_id: str, path: str = ".") -> list[str]:
     """
     List files in the sandbox session directory.

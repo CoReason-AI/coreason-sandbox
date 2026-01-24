@@ -9,16 +9,16 @@
 # Source Code: https://github.com/CoReason-AI/coreason_sandbox
 
 import base64
+from typing import Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from mcp.types import ImageContent, TextContent
-
 from coreason_sandbox.main import execute_code, install_package, list_files, main
+from mcp.types import ImageContent, TextContent
 
 
 @pytest.fixture
-def mock_sandbox():
+def mock_sandbox() -> Generator[MagicMock, None, None]:
     with patch("coreason_sandbox.main.sandbox", new_callable=MagicMock) as mock:
         # Configure methods to be awaitable
         mock.execute_code = AsyncMock()
@@ -28,7 +28,7 @@ def mock_sandbox():
 
 
 @pytest.mark.asyncio
-async def test_execute_code_text_only(mock_sandbox):
+async def test_execute_code_text_only(mock_sandbox: MagicMock) -> None:
     # Setup
     mock_sandbox.execute_code.return_value = {
         "stdout": "hello",
@@ -51,7 +51,7 @@ async def test_execute_code_text_only(mock_sandbox):
 
 
 @pytest.mark.asyncio
-async def test_execute_code_stderr(mock_sandbox):
+async def test_execute_code_stderr(mock_sandbox: MagicMock) -> None:
     # Setup
     mock_sandbox.execute_code.return_value = {
         "stdout": "",
@@ -71,7 +71,7 @@ async def test_execute_code_stderr(mock_sandbox):
 
 
 @pytest.mark.asyncio
-async def test_execute_code_with_image(mock_sandbox):
+async def test_execute_code_with_image(mock_sandbox: MagicMock) -> None:
     # Setup
     img_bytes = b"fake_image_data"
     b64_img = base64.b64encode(img_bytes).decode("utf-8")
@@ -107,7 +107,7 @@ async def test_execute_code_with_image(mock_sandbox):
 
 
 @pytest.mark.asyncio
-async def test_execute_code_with_image_missing_content_type(mock_sandbox):
+async def test_execute_code_with_image_missing_content_type(mock_sandbox: MagicMock) -> None:
     # Setup
     img_bytes = b"fake_image_data"
     b64_img = base64.b64encode(img_bytes).decode("utf-8")
@@ -137,7 +137,7 @@ async def test_execute_code_with_image_missing_content_type(mock_sandbox):
 
 
 @pytest.mark.asyncio
-async def test_execute_code_malformed_image_url(mock_sandbox):
+async def test_execute_code_malformed_image_url(mock_sandbox: MagicMock) -> None:
     # Setup
     mock_sandbox.execute_code.return_value = {
         "stdout": "",
@@ -161,7 +161,7 @@ async def test_execute_code_malformed_image_url(mock_sandbox):
 
 
 @pytest.mark.asyncio
-async def test_execute_code_with_non_image_artifact(mock_sandbox):
+async def test_execute_code_with_non_image_artifact(mock_sandbox: MagicMock) -> None:
     # Setup
     mock_sandbox.execute_code.return_value = {
         "stdout": "",
@@ -186,7 +186,7 @@ async def test_execute_code_with_non_image_artifact(mock_sandbox):
 
 
 @pytest.mark.asyncio
-async def test_execute_code_exception(mock_sandbox):
+async def test_execute_code_exception(mock_sandbox: MagicMock) -> None:
     mock_sandbox.execute_code.side_effect = Exception("Boom")
 
     result = await execute_code("sess", "python", "code")
@@ -196,34 +196,34 @@ async def test_execute_code_exception(mock_sandbox):
 
 
 @pytest.mark.asyncio
-async def test_install_package(mock_sandbox):
+async def test_install_package(mock_sandbox: MagicMock) -> None:
     mock_sandbox.install_package.return_value = "Success"
     result = await install_package("sess", "pandas")
     assert result == "Success"
 
 
 @pytest.mark.asyncio
-async def test_install_package_exception(mock_sandbox):
+async def test_install_package_exception(mock_sandbox: MagicMock) -> None:
     mock_sandbox.install_package.side_effect = Exception("Fail")
     result = await install_package("sess", "pandas")
     assert "Error installing package: Fail" in result
 
 
 @pytest.mark.asyncio
-async def test_list_files(mock_sandbox):
+async def test_list_files(mock_sandbox: MagicMock) -> None:
     mock_sandbox.list_files.return_value = ["file1", "file2"]
     result = await list_files("sess", ".")
     assert result == ["file1", "file2"]
 
 
 @pytest.mark.asyncio
-async def test_list_files_exception(mock_sandbox):
+async def test_list_files_exception(mock_sandbox: MagicMock) -> None:
     mock_sandbox.list_files.side_effect = Exception("Fail")
     result = await list_files("sess", ".")
     assert result == ["Error listing files: Fail"]
 
 
-def test_main_execution():
+def test_main_execution() -> None:
     with patch("coreason_sandbox.main.mcp.run") as mock_run:
         main()
         mock_run.assert_called_once()
