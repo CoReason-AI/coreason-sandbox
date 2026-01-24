@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from coreason_sandbox.mcp import SandboxMCP
 
+
 @pytest.fixture
 def mock_runtime() -> Any:
     runtime = AsyncMock()
@@ -14,10 +15,12 @@ def mock_runtime() -> Any:
     runtime.execute.return_value.artifacts = []
     return runtime
 
+
 @pytest.fixture
 def mock_factory(mock_runtime: Any) -> Any:
     with patch("coreason_sandbox.mcp.SandboxFactory.get_runtime", return_value=mock_runtime) as mock:
         yield mock
+
 
 @pytest.mark.asyncio
 async def test_reaper_exception_handling(mock_factory: Any, mock_runtime: Any) -> None:
@@ -30,6 +33,7 @@ async def test_reaper_exception_handling(mock_factory: Any, mock_runtime: Any) -
         assert mcp._reaper_task is not None
         await mcp._reaper_task
         assert mcp._reaper_task.done()
+
 
 @pytest.mark.asyncio
 async def test_reaper_cancellation_coverage(mock_factory: Any, mock_runtime: Any) -> None:
@@ -52,6 +56,7 @@ async def test_reaper_cancellation_coverage(mock_factory: Any, mock_runtime: Any
 
     # Yield control to ensure async cleanup happens and coverage is flushed
     await asyncio.sleep(0.1)
+
 
 @pytest.mark.asyncio
 async def test_shutdown_terminate_exception(mock_factory: Any, mock_runtime: Any) -> None:
