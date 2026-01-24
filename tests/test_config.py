@@ -2,7 +2,6 @@ import os
 from unittest import mock
 
 import pytest
-
 from coreason_sandbox.config import SandboxConfig
 
 

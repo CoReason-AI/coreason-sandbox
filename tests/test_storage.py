@@ -4,7 +4,6 @@ from unittest.mock import patch
 
 import pytest
 from botocore.exceptions import ClientError
-
 from coreason_sandbox.utils.storage import S3Storage
 
 

@@ -3,7 +3,6 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from coreason_sandbox.mcp import SandboxMCP
 from coreason_sandbox.models import ExecutionResult
 
@@ -44,7 +43,7 @@ async def test_complex_concurrent_mixed_validation(mock_factory: Any, mock_runti
     # Define tasks
     async def valid_req() -> str:
         res = await mcp.execute_code(valid_id, "python", "pass")
-        return res["stdout"]
+        return str(res["stdout"])
 
     async def invalid_req() -> None:
         await mcp.execute_code("", "python", "pass")
