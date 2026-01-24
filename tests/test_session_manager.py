@@ -166,3 +166,47 @@ async def test_shutdown_with_error(mock_factory: Any, mock_runtime: Any) -> None
 
     assert len(manager.sessions) == 0
     # Should not raise
+
+
+@pytest.mark.asyncio
+async def test_runtime_start_failure(mock_factory: Any, mock_runtime: Any) -> None:
+    """Verify that if runtime.start() fails, the session is not cached."""
+    manager = SessionManager()
+    mock_runtime.start.side_effect = Exception("Start failed")
+
+    with pytest.raises(Exception, match="Start failed"):
+        await manager.get_or_create_session("fail_start")
+
+    # Session should not be in the dictionary
+    assert "fail_start" not in manager.sessions
+
+    # Subsequent success should work
+    mock_runtime.start.side_effect = None
+    session = await manager.get_or_create_session("fail_start")
+    assert session is not None
+    assert "fail_start" in manager.sessions
+
+
+@pytest.mark.asyncio
+async def test_zero_idle_timeout(mock_factory: Any, mock_runtime: Any) -> None:
+    """Verify behavior when idle_timeout is 0 (immediate expiration)."""
+    # Config: 0 timeout
+    config = SandboxConfig(idle_timeout=0.0, reaper_interval=0.01)
+    manager = SessionManager(config)
+
+    # Use real time mostly, but patch for control if needed
+    # If we insert a session, it is immediately expired.
+
+    with patch("coreason_sandbox.session_manager.time.time", return_value=1000.0):
+        await manager.get_or_create_session("immediate_expire")
+
+    assert "immediate_expire" in manager.sessions
+
+    # Advance time by minimal amount (e.g. 0.0001) which is > 0.0
+    with patch("coreason_sandbox.session_manager.time.time", return_value=1000.0001):
+        await asyncio.sleep(0.05)  # Wait for reaper
+
+        assert "immediate_expire" not in manager.sessions
+        mock_runtime.terminate.assert_called_once()
+
+    await manager.shutdown()
