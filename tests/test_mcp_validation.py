@@ -1,5 +1,7 @@
 import pytest
+
 from coreason_sandbox.mcp import SandboxMCP
+
 
 @pytest.mark.asyncio
 async def test_mcp_validation_empty_session_id() -> None:

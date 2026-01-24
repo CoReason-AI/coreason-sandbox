@@ -2,6 +2,7 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
+
 from coreason_sandbox.utils.veritas import VeritasIntegrator
 
 
