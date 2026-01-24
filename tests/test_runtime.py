@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Literal
 
 import pytest
-
 from coreason_sandbox.models import ExecutionResult, FileReference
 from coreason_sandbox.runtime import SandboxRuntime
 

@@ -3,7 +3,6 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from coreason_sandbox.runtimes.docker import DockerRuntime
 
 
