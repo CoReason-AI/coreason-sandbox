@@ -42,7 +42,10 @@ class E2BRuntime(SandboxRuntime):
                 E2BSandbox,
                 api_key=self.api_key,
             )
-            logger.info(f"E2B sandbox started: {self.sandbox.sandbox_id}")
+            # Use local variable to satisfy mypy or assert
+            sandbox = self.sandbox
+            assert sandbox is not None
+            logger.info(f"E2B sandbox started: {sandbox.sandbox_id}")
         except Exception as e:
             logger.error(f"Failed to start E2B sandbox: {e}")
             raise
