@@ -8,7 +8,8 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_sandbox
 
-from typing import Any, Literal, cast
+from contextlib import asynccontextmanager
+from typing import Any, AsyncIterator, Literal, cast
 
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ImageContent, TextContent
@@ -18,8 +19,19 @@ from coreason_sandbox.mcp import SandboxMCP
 # Initialize Sandbox Logic
 sandbox = SandboxMCP()
 
+
+@asynccontextmanager
+async def lifespan(server: FastMCP) -> AsyncIterator[None]:
+    """
+    Manage lifecycle of the MCP server.
+    Ensures that the sandbox background tasks are cleaned up on shutdown.
+    """
+    yield
+    await sandbox.shutdown()
+
+
 # Initialize MCP Server
-mcp = FastMCP("coreason-sandbox")
+mcp = FastMCP("coreason-sandbox", lifespan=lifespan)
 
 
 @mcp.tool()  # type: ignore[misc]
