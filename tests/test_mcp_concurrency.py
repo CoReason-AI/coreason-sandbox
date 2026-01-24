@@ -87,9 +87,7 @@ async def test_execution_during_reaping_race(mock_factory: Any, mock_runtime: An
         r1.execute.assert_not_called()
         r2.execute.assert_called_once()
 
-    await _run_race_test(
-        mcp, "race_exec", lambda: mcp.execute_code("race_exec", "python", "pass"), mock_runtime, check
-    )
+    await _run_race_test(mcp, "race_exec", lambda: mcp.execute_code("race_exec", "python", "pass"), mock_runtime, check)
     await mcp.shutdown()
 
 
@@ -102,9 +100,7 @@ async def test_install_package_during_reaping_race(mock_factory: Any, mock_runti
         r1.install_package.assert_not_called()
         r2.install_package.assert_called_once()
 
-    await _run_race_test(
-        mcp, "race_install", lambda: mcp.install_package("race_install", "pkg"), mock_runtime, check
-    )
+    await _run_race_test(mcp, "race_install", lambda: mcp.install_package("race_install", "pkg"), mock_runtime, check)
     await mcp.shutdown()
 
 
@@ -117,7 +113,5 @@ async def test_list_files_during_reaping_race(mock_factory: Any, mock_runtime: A
         r1.list_files.assert_not_called()
         r2.list_files.assert_called_once()
 
-    await _run_race_test(
-        mcp, "race_ls", lambda: mcp.list_files("race_ls", "."), mock_runtime, check
-    )
+    await _run_race_test(mcp, "race_ls", lambda: mcp.list_files("race_ls", "."), mock_runtime, check)
     await mcp.shutdown()
