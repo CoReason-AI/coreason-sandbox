@@ -4,8 +4,9 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-import coreason_sandbox.utils.veritas
 import pytest
+
+import coreason_sandbox.utils.veritas
 from coreason_sandbox.utils.artifacts import ArtifactManager
 
 # --- ArtifactManager Tests ---
