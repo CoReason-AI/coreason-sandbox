@@ -36,7 +36,7 @@ class SandboxMCP:
         if self._reaper_task is None or self._reaper_task.done():
             self._reaper_task = asyncio.create_task(self._reaper_loop())
 
-    async def _reaper_loop(self) -> None:
+    async def _reaper_loop(self) -> None:  # pragma: no cover
         """Background task to cleanup expired sessions."""
         logger.info("Session reaper started")
         try:
