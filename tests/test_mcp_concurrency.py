@@ -3,8 +3,9 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from coreason_sandbox.mcp import SandboxMCP, Session
+from coreason_sandbox.mcp import SandboxMCP
 from coreason_sandbox.models import ExecutionResult
+from coreason_sandbox.session_manager import Session
 
 
 @pytest.fixture
@@ -21,7 +22,7 @@ def mock_runtime() -> Any:
 
 @pytest.fixture
 def mock_factory(mock_runtime: Any) -> Any:
-    with patch("coreason_sandbox.mcp.SandboxFactory.get_runtime", return_value=mock_runtime) as mock:
+    with patch("coreason_sandbox.session_manager.SandboxFactory.get_runtime", return_value=mock_runtime) as mock:
         yield mock
 
 
@@ -36,8 +37,9 @@ async def test_concurrent_session_creation(mock_factory: Any, mock_runtime: Any)
 
     mock_runtime.start.side_effect = slow_start
 
-    t1 = asyncio.create_task(mcp._get_or_create_session(session_id))
-    t2 = asyncio.create_task(mcp._get_or_create_session(session_id))
+    # Access session_manager directly
+    t1 = asyncio.create_task(mcp.session_manager.get_or_create_session(session_id))
+    t2 = asyncio.create_task(mcp.session_manager.get_or_create_session(session_id))
 
     s1, s2 = await asyncio.gather(t1, t2)
 
@@ -52,7 +54,7 @@ async def _run_race_test(
     mcp: SandboxMCP, session_id: str, coro_func: Any, mock_runtime: Any, success_check: Any
 ) -> None:
     """Helper to run the race condition test pattern."""
-    session1 = await mcp._get_or_create_session(session_id)
+    session1 = await mcp.session_manager.get_or_create_session(session_id)
     await session1.lock.acquire()
 
     # Simulate session 1 poisoned
@@ -69,7 +71,8 @@ async def _run_race_test(
 
     session2 = Session(runtime=mock_runtime2, last_accessed=0)
 
-    with patch.object(mcp, "_get_or_create_session", side_effect=[session1, session2]):
+    # Patch the method on the session_manager instance
+    with patch.object(mcp.session_manager, "get_or_create_session", side_effect=[session1, session2]):
         t_exec = asyncio.create_task(coro_func())
         await asyncio.sleep(0.01)
         session1.lock.release()

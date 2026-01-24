@@ -20,7 +20,7 @@ def mock_runtime() -> Any:
 
 @pytest.fixture
 def mock_factory(mock_runtime: Any) -> Any:
-    with patch("coreason_sandbox.mcp.SandboxFactory.get_runtime", return_value=mock_runtime) as mock:
+    with patch("coreason_sandbox.session_manager.SandboxFactory.get_runtime", return_value=mock_runtime) as mock:
         yield mock
 
 
