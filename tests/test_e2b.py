@@ -1,3 +1,5 @@
+import asyncio
+import time
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -119,15 +121,6 @@ async def test_execute_python_filesystem_artifacts(e2b_runtime: E2BRuntime) -> N
     entry2 = MagicMock()
     entry2.name = "new.csv"
 
-    # We need to control the sequence of return values for list_files
-    # But list_files is an async wrapper or sync? In e2b_runtime it's async wrapper calling sandbox.files.list
-    # sandbox.files.list is synchronous in the SDK usually, but let's check wrapper.
-    # e2b_runtime.list_files uses sandbox.files.list(path).
-
-    # We need to verify how we can mock 'before' and 'after' calls.
-    # If the implementation calls self.list_files("."), we can mock that method on the instance?
-    # Or mock sandbox.files.list side_effect.
-
     e2b_runtime.sandbox.files.list.side_effect = [
         [entry1],  # Before
         [entry1, entry2],  # After
@@ -135,9 +128,6 @@ async def test_execute_python_filesystem_artifacts(e2b_runtime: E2BRuntime) -> N
 
     # Mock download
     e2b_runtime.sandbox.files.read.return_value = b"csv_content"
-
-    # We expect the implementation to call list_files before and after
-    # And then download the new file
 
     result = await e2b_runtime.execute("create_csv()", "python")
 
@@ -294,11 +284,6 @@ async def test_terminate_exception(e2b_runtime: E2BRuntime) -> None:
     # Should not raise exception
     await e2b_runtime.terminate()
 
-    # Even if close failed, we expect sandbox reference to be cleared
-    # But current implementation (before my fix) might not.
-    # The failing test showed it was NOT cleared.
-    # I will FIX the implementation in next step.
-    # Here I assert that it IS None, assuming I fix it.
     assert e2b_runtime.sandbox is None
 
 
@@ -352,19 +337,15 @@ async def test_list_files_exception(e2b_runtime: E2BRuntime) -> None:
 
 @pytest.mark.asyncio
 async def test_list_files_internal_exception(e2b_runtime: E2BRuntime) -> None:
-    # Test _list_files_internal handles exceptions
     assert e2b_runtime.sandbox is not None
     e2b_runtime.sandbox.files.list.side_effect = Exception("Fail")
 
-    # We call _list_files_internal directly to verify it returns empty set
-    # Note: access private method for testing
     files = await e2b_runtime._list_files_internal(".")
     assert files == set()
 
 
 @pytest.mark.asyncio
 async def test_list_files_internal_no_sandbox() -> None:
-    # Test _list_files_internal when sandbox not started (raises RuntimeError)
     runtime = E2BRuntime()
     files = await runtime._list_files_internal(".")
     assert files == set()
@@ -372,7 +353,6 @@ async def test_list_files_internal_no_sandbox() -> None:
 
 @pytest.mark.asyncio
 async def test_execute_python_artifact_retrieval_exception(e2b_runtime: E2BRuntime) -> None:
-    """Test handling of artifact retrieval failure."""
     mock_exec = MagicMock()
     mock_exec.logs.stdout = []
     mock_exec.logs.stderr = []
@@ -389,12 +369,10 @@ async def test_execute_python_artifact_retrieval_exception(e2b_runtime: E2BRunti
         [entry1],  # After
     ]
 
-    # Mock download failure
     e2b_runtime.sandbox.files.read.side_effect = Exception("Download Fail")
 
     result = await e2b_runtime.execute("create()", "python")
 
-    # Should not fail, just skip artifact
     assert len(result.artifacts) == 0
     assert result.exit_code == 0
 
@@ -408,7 +386,6 @@ async def test_list_files_no_sandbox() -> None:
 
 @pytest.mark.asyncio
 async def test_execute_python_multiple_artifacts_with_spaces(e2b_runtime: E2BRuntime) -> None:
-    """Test detection of multiple files, including those with spaces."""
     mock_exec = MagicMock()
     mock_exec.logs.stdout = []
     mock_exec.logs.stderr = []
@@ -418,7 +395,6 @@ async def test_execute_python_multiple_artifacts_with_spaces(e2b_runtime: E2BRun
     assert e2b_runtime.sandbox is not None
     e2b_runtime.sandbox.run_code.return_value = mock_exec
 
-    # Files
     entry1 = MagicMock()
     entry1.name = "data.csv"
     entry2 = MagicMock()
@@ -431,7 +407,6 @@ async def test_execute_python_multiple_artifacts_with_spaces(e2b_runtime: E2BRun
         [entry1, entry2, entry3],  # After
     ]
 
-    # Mock download (return distinct content to verify mapping)
     def side_effect_read(path: str) -> bytes | None:
         if path == "data.csv":
             return b"csv"
@@ -452,7 +427,6 @@ async def test_execute_python_multiple_artifacts_with_spaces(e2b_runtime: E2BRun
 
 @pytest.mark.asyncio
 async def test_execute_file_deletion_and_modification(e2b_runtime: E2BRuntime) -> None:
-    """Verify that deleted or modified files are NOT flagged as new artifacts."""
     mock_exec = MagicMock()
     mock_exec.logs.stdout = []
     mock_exec.logs.stderr = []
@@ -462,25 +436,185 @@ async def test_execute_file_deletion_and_modification(e2b_runtime: E2BRuntime) -
     assert e2b_runtime.sandbox is not None
     e2b_runtime.sandbox.run_code.return_value = mock_exec
 
-    # Files
     entry_existing = MagicMock()
     entry_existing.name = "config.json"
     entry_modified = MagicMock()
     entry_modified.name = "data.csv"
-
-    # Before: config.json exists, data.csv exists
-    # After: config.json deleted, data.csv modified (still exists), new.txt created
 
     e2b_runtime.sandbox.files.list.side_effect = [
         [entry_existing, entry_modified],  # Before
         [entry_modified],  # After (config.json gone)
     ]
 
-    # Mock download
     e2b_runtime.sandbox.files.read.return_value = b"content"
 
     result = await e2b_runtime.execute("delete_and_modify()", "python")
 
-    # new_files = {data.csv} - {config.json, data.csv} = {}
-    # So no artifacts should be detected (modification not detected by name diff)
     assert len(result.artifacts) == 0
+
+
+@pytest.mark.asyncio
+async def test_execute_python_timeout(e2b_runtime: E2BRuntime) -> None:
+    """Test that execution enforces timeout."""
+    e2b_runtime.timeout = 0.1
+
+    def long_running_code(*args: Any, **kwargs: Any) -> Any:
+        time.sleep(0.2)
+        return MagicMock()
+
+    assert e2b_runtime.sandbox is not None
+    e2b_runtime.sandbox.run_code.side_effect = long_running_code
+
+    with pytest.raises(TimeoutError, match="Execution exceeded 0.1 seconds limit"):
+        await e2b_runtime.execute("while True: pass", "python")
+
+
+@pytest.mark.asyncio
+async def test_execute_bash_timeout(e2b_runtime: E2BRuntime) -> None:
+    """Test that bash execution enforces timeout."""
+    e2b_runtime.timeout = 0.1
+
+    def long_running_code(*args: Any, **kwargs: Any) -> Any:
+        time.sleep(0.2)
+        return MagicMock()
+
+    assert e2b_runtime.sandbox is not None
+    e2b_runtime.sandbox.commands.run.side_effect = long_running_code
+
+    with pytest.raises(TimeoutError, match="Execution exceeded 0.1 seconds limit"):
+        await e2b_runtime.execute("sleep 10", "bash")
+
+
+@pytest.mark.asyncio
+async def test_execute_r_timeout(e2b_runtime: E2BRuntime) -> None:
+    """Test that R execution enforces timeout."""
+    e2b_runtime.timeout = 0.1
+
+    def long_running_code(*args: Any, **kwargs: Any) -> Any:
+        time.sleep(0.2)
+        return MagicMock()
+
+    assert e2b_runtime.sandbox is not None
+    e2b_runtime.sandbox.commands.run.side_effect = long_running_code
+
+    with pytest.raises(TimeoutError, match="Execution exceeded 0.1 seconds limit"):
+        await e2b_runtime.execute("Sys.sleep(10)", "r")
+
+
+@pytest.mark.asyncio
+async def test_start_idempotency_with_restart(e2b_runtime: E2BRuntime) -> None:
+    """Test that calling start() on a running sandbox terminates the old one first."""
+    assert e2b_runtime.sandbox is not None
+    old_sandbox = e2b_runtime.sandbox
+
+    # Mock close to verify it's called
+    old_sandbox.close = MagicMock()
+
+    # We need to mock Sandbox constructor again to return a NEW sandbox
+    with patch("coreason_sandbox.runtimes.e2b.E2BSandbox") as mock_new_sandbox_cls:
+        new_sandbox_mock = MagicMock()
+        new_sandbox_mock.sandbox_id = "new_id"
+        mock_new_sandbox_cls.return_value = new_sandbox_mock
+
+        await e2b_runtime.start()
+
+        # Verify old sandbox was closed
+        old_sandbox.close.assert_called_once()
+
+        # Verify new sandbox is set
+        assert e2b_runtime.sandbox == new_sandbox_mock
+        assert e2b_runtime.sandbox.sandbox_id == "new_id"
+
+
+@pytest.mark.asyncio
+async def test_execute_sequential_persistence(e2b_runtime: E2BRuntime) -> None:
+    """Verify multiple execute calls use the same sandbox instance."""
+    assert e2b_runtime.sandbox is not None
+    original_sandbox = e2b_runtime.sandbox
+
+    # Mock result 1
+    mock_exec1 = MagicMock()
+    mock_exec1.logs.stdout = [MagicMock(content="step1")]
+    mock_exec1.logs.stderr = []
+    mock_exec1.error = None
+    mock_exec1.results = []
+
+    # Mock result 2
+    mock_exec2 = MagicMock()
+    mock_exec2.logs.stdout = [MagicMock(content="step2")]
+    mock_exec2.logs.stderr = []
+    mock_exec2.error = None
+    mock_exec2.results = []
+
+    e2b_runtime.sandbox.run_code.side_effect = [mock_exec1, mock_exec2]
+
+    # Run 1
+    res1 = await e2b_runtime.execute("x=1", "python")
+    assert res1.stdout == "step1"
+
+    # Run 2
+    res2 = await e2b_runtime.execute("print(x)", "python")
+    assert res2.stdout == "step2"
+
+    # Verify sandbox instance didn't change
+    assert e2b_runtime.sandbox is original_sandbox
+    # Verify run_code called twice on same instance
+    assert e2b_runtime.sandbox.run_code.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_execute_error_persistence(e2b_runtime: E2BRuntime) -> None:
+    """Verify non-fatal error doesn't restart sandbox."""
+    assert e2b_runtime.sandbox is not None
+    original_sandbox = e2b_runtime.sandbox
+
+    # Mock error execution (e.g. syntax error)
+    mock_exec_err = MagicMock()
+    mock_exec_err.logs.stdout = []
+    mock_exec_err.logs.stderr = []
+    mock_exec_err.error = MagicMock(name="SyntaxError", value="invalid syntax", traceback="")
+    mock_exec_err.results = []
+
+    # Mock success execution
+    mock_exec_ok = MagicMock()
+    mock_exec_ok.logs.stdout = [MagicMock(content="ok")]
+    mock_exec_ok.logs.stderr = []
+    mock_exec_ok.error = None
+    mock_exec_ok.results = []
+
+    e2b_runtime.sandbox.run_code.side_effect = [mock_exec_err, mock_exec_ok]
+
+    # Run 1 (Error)
+    res1 = await e2b_runtime.execute("syntax error", "python")
+    assert res1.exit_code == 1
+
+    # Run 2 (OK)
+    res2 = await e2b_runtime.execute("print('ok')", "python")
+    assert res2.exit_code == 0
+
+    # Verify sandbox instance preserved
+    assert e2b_runtime.sandbox is original_sandbox
+
+
+@pytest.mark.asyncio
+async def test_concurrent_terminate_during_execute(e2b_runtime: E2BRuntime) -> None:
+    """Simulate terminate being called while execute is waiting."""
+    assert e2b_runtime.sandbox is not None
+
+    def side_effect(*args: Any, **kwargs: Any) -> MagicMock:
+        time.sleep(0.2)
+        return MagicMock(logs=MagicMock(stdout=[], stderr=[]), error=None, results=[])
+
+    e2b_runtime.sandbox.run_code.side_effect = side_effect
+
+    # Start execute task
+    exec_task = asyncio.create_task(e2b_runtime.execute("sleep", "python"))
+
+    # Wait a bit then terminate
+    await asyncio.sleep(0.05)
+    await e2b_runtime.terminate()
+
+    result = await exec_task
+
+    assert e2b_runtime.sandbox is None
+    assert result.exit_code == 0

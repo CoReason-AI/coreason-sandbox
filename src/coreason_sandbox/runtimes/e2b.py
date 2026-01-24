@@ -1,16 +1,18 @@
+import asyncio
 import os
 import tempfile
 import time
 from pathlib import Path
-from typing import Literal
+from typing import Any, Callable, Literal, TypeVar
 
 from e2b_code_interpreter import Sandbox as E2BSandbox
-from e2b_code_interpreter.models import Execution as E2BExecution
 from loguru import logger
 
 from coreason_sandbox.models import ExecutionResult, FileReference
 from coreason_sandbox.runtime import SandboxRuntime
 from coreason_sandbox.utils.artifacts import ArtifactManager
+
+T = TypeVar("T")
 
 
 class E2BRuntime(SandboxRuntime):
@@ -35,12 +37,20 @@ class E2BRuntime(SandboxRuntime):
         """
         Boot the environment.
         """
+        if self.sandbox:
+            logger.warning("E2B sandbox already running. Terminating old session before restart.")
+            await self.terminate()
+
         logger.info(f"Starting E2B sandbox (template: {self.template})")
         try:
-            self.sandbox = E2BSandbox(
+            self.sandbox = await asyncio.to_thread(
+                E2BSandbox,
                 api_key=self.api_key,
             )
-            logger.info(f"E2B sandbox started: {self.sandbox.sandbox_id}")
+            # Use local variable to satisfy mypy or assert
+            sandbox = self.sandbox
+            assert sandbox is not None
+            logger.info(f"E2B sandbox started: {sandbox.sandbox_id}")
         except Exception as e:
             logger.error(f"Failed to start E2B sandbox: {e}")
             raise
@@ -58,7 +68,7 @@ class E2BRuntime(SandboxRuntime):
             # e2b_code_interpreter.Sandbox has commands.run
             # But check if there is a specialized method.
             # According to docs, `sandbox.commands.run("pip install ...")` is standard.
-            self.sandbox.commands.run(f"pip install {package_name}")
+            await asyncio.to_thread(self.sandbox.commands.run, f"pip install {package_name}")
         except Exception as e:
             logger.error(f"Failed to install package: {e}")
             raise
@@ -72,7 +82,7 @@ class E2BRuntime(SandboxRuntime):
 
         try:
             # E2B SDK has `files.list(path)`
-            entries = self.sandbox.files.list(path)
+            entries = await asyncio.to_thread(self.sandbox.files.list, path)
             # entries is List[EntryInfo]
             return [entry.name for entry in entries]
         except Exception as e:
@@ -87,6 +97,22 @@ class E2BRuntime(SandboxRuntime):
         except Exception:
             return set()
 
+    async def _run_sdk_command(self, func: Callable[..., T], *args: Any) -> T:
+        """
+        Helper to run an SDK command in a thread with timeout enforcement.
+        Restart sandbox on timeout.
+        """
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(func, *args),
+                timeout=self.timeout,
+            )
+        except asyncio.TimeoutError as e:
+            logger.warning(f"Execution timed out ({self.timeout}s). Restarting sandbox to cleanup process.")
+            await self.terminate()
+            await self.start()
+            raise TimeoutError(f"Execution exceeded {self.timeout} seconds limit.") from e
+
     async def execute(self, code: str, language: Literal["python", "bash", "r"]) -> ExecutionResult:
         """
         Run script and capture output.
@@ -100,9 +126,16 @@ class E2BRuntime(SandboxRuntime):
         files_before = await self._list_files_internal(".")
 
         start_time = time.time()
+        stdout = ""
+        stderr = ""
+        exit_code = 0
+        artifacts = []
+
         try:
             if language == "python":
-                execution: E2BExecution = self.sandbox.run_code(code)
+                execution = await self._run_sdk_command(self.sandbox.run_code, code)
+                # execution is E2BExecution (though _run_sdk_command type hint is generic T)
+                # We know specific type based on call
 
                 stdout = "\n".join(log.content for log in execution.logs.stdout)
                 stderr = "\n".join(log.content for log in execution.logs.stderr)
@@ -113,7 +146,6 @@ class E2BRuntime(SandboxRuntime):
                 else:
                     exit_code = 0
 
-                artifacts = []
                 # 1. Native E2B artifacts (PNGs)
                 for result in execution.results:
                     if hasattr(result, "png") and result.png:
@@ -129,18 +161,16 @@ class E2BRuntime(SandboxRuntime):
                         stdout += f"\n[Result]: {result.text}"
 
             elif language == "bash":
-                cmd_result = self.sandbox.commands.run(code)
+                cmd_result = await self._run_sdk_command(self.sandbox.commands.run, code)
                 stdout = cmd_result.stdout
                 stderr = cmd_result.stderr
                 exit_code = cmd_result.exit_code
-                artifacts = []
 
             elif language == "r":
-                cmd_result = self.sandbox.commands.run(f"Rscript -e '{code}'")
+                cmd_result = await self._run_sdk_command(self.sandbox.commands.run, f"Rscript -e '{code}'")
                 stdout = cmd_result.stdout
                 stderr = cmd_result.stderr
                 exit_code = cmd_result.exit_code
-                artifacts = []
 
             else:
                 raise ValueError(f"Unsupported language: {language}")
@@ -188,7 +218,7 @@ class E2BRuntime(SandboxRuntime):
 
         try:
             with open(local_path, "rb") as f:
-                self.sandbox.files.write(remote_path, f)
+                await asyncio.to_thread(self.sandbox.files.write, remote_path, f)
         except Exception as e:
             logger.error(f"E2B upload failed: {e}")
             raise
@@ -201,7 +231,7 @@ class E2BRuntime(SandboxRuntime):
             raise RuntimeError("Sandbox not started")
 
         try:
-            content_bytes = self.sandbox.files.read(remote_path)
+            content_bytes = await asyncio.to_thread(self.sandbox.files.read, remote_path)
 
             if content_bytes is None:
                 raise FileNotFoundError(f"Remote file not found: {remote_path}")
@@ -219,7 +249,7 @@ class E2BRuntime(SandboxRuntime):
         if self.sandbox:
             logger.info(f"Terminating E2B sandbox: {self.sandbox.sandbox_id}")
             try:
-                self.sandbox.close()
+                await asyncio.to_thread(self.sandbox.close)
             except Exception as e:
                 logger.warning(f"Error terminating E2B sandbox: {e}")
             finally:
