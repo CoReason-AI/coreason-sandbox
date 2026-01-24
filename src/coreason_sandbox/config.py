@@ -19,6 +19,13 @@ class SandboxConfig(BaseSettings):
     }
     execution_timeout: float = 60.0
 
+    # S3 / Object Storage
+    s3_bucket: str | None = None
+    s3_region: str | None = None
+    s3_access_key: str | None = None
+    s3_secret_key: str | None = None
+    s3_endpoint_url: str | None = None
+
     model_config = SettingsConfigDict(
         env_prefix="COREASON_SANDBOX_",
         env_file=".env",
