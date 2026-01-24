@@ -18,8 +18,8 @@ class SandboxConfig(BaseSettings):
         "scipy",
     }
     execution_timeout: float = 60.0
-    idle_timeout: float = 300.0
-    reaper_interval: float = 60.0
+    idle_timeout: float = 300.0  # 5 minutes
+    reaper_interval: float = 60.0  # Check every minute
 
     # S3 / Object Storage
     s3_bucket: str | None = None

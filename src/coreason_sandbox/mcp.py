@@ -106,6 +106,9 @@ class SandboxMCP:
         Execute code in the sandbox for the given session.
         Retries if session is terminated during acquisition.
         """
+        if not session_id:
+            raise ValueError("Session ID is required")
+
         while True:
             session = await self._get_or_create_session(session_id)
 
@@ -146,6 +149,9 @@ class SandboxMCP:
         """
         Install a package in the sandbox session.
         """
+        if not session_id:
+            raise ValueError("Session ID is required")
+
         while True:
             session = await self._get_or_create_session(session_id)
 
@@ -163,6 +169,9 @@ class SandboxMCP:
         """
         List files in the sandbox session directory.
         """
+        if not session_id:
+            raise ValueError("Session ID is required")
+
         while True:
             session = await self._get_or_create_session(session_id)
 
