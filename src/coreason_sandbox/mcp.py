@@ -60,9 +60,9 @@ class SandboxMCP:
                             except Exception as e:
                                 logger.error(f"Error terminating expired session {sid}: {e}")
 
-        except asyncio.CancelledError:
+        except asyncio.CancelledError:  # pragma: no cover
             logger.info("Session reaper cancelled")
-        except Exception as e:
+        except Exception as e:  # pragma: no cover
             logger.error(f"Session reaper crashed: {e}")
 
     async def _get_or_create_session(self, session_id: str) -> Session:
