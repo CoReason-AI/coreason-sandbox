@@ -3,15 +3,16 @@ import os
 import tempfile
 import time
 from pathlib import Path
-from typing import Literal
+from typing import Any, Callable, Literal, TypeVar
 
 from e2b_code_interpreter import Sandbox as E2BSandbox
-from e2b_code_interpreter.models import Execution as E2BExecution
 from loguru import logger
 
 from coreason_sandbox.models import ExecutionResult, FileReference
 from coreason_sandbox.runtime import SandboxRuntime
 from coreason_sandbox.utils.artifacts import ArtifactManager
+
+T = TypeVar("T")
 
 
 class E2BRuntime(SandboxRuntime):
@@ -96,6 +97,22 @@ class E2BRuntime(SandboxRuntime):
         except Exception:
             return set()
 
+    async def _run_sdk_command(self, func: Callable[..., T], *args: Any) -> T:
+        """
+        Helper to run an SDK command in a thread with timeout enforcement.
+        Restart sandbox on timeout.
+        """
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(func, *args),
+                timeout=self.timeout,
+            )
+        except asyncio.TimeoutError as e:
+            logger.warning(f"Execution timed out ({self.timeout}s). Restarting sandbox to cleanup process.")
+            await self.terminate()
+            await self.start()
+            raise TimeoutError(f"Execution exceeded {self.timeout} seconds limit.") from e
+
     async def execute(self, code: str, language: Literal["python", "bash", "r"]) -> ExecutionResult:
         """
         Run script and capture output.
@@ -109,18 +126,16 @@ class E2BRuntime(SandboxRuntime):
         files_before = await self._list_files_internal(".")
 
         start_time = time.time()
+        stdout = ""
+        stderr = ""
+        exit_code = 0
+        artifacts = []
+
         try:
             if language == "python":
-                try:
-                    execution: E2BExecution = await asyncio.wait_for(
-                        asyncio.to_thread(self.sandbox.run_code, code),
-                        timeout=self.timeout,
-                    )
-                except asyncio.TimeoutError as e:
-                    logger.warning(f"Execution timed out ({self.timeout}s). " f"Restarting sandbox to cleanup process.")
-                    await self.terminate()
-                    await self.start()
-                    raise TimeoutError(f"Execution exceeded {self.timeout} seconds limit.") from e
+                execution = await self._run_sdk_command(self.sandbox.run_code, code)
+                # execution is E2BExecution (though _run_sdk_command type hint is generic T)
+                # We know specific type based on call
 
                 stdout = "\n".join(log.content for log in execution.logs.stdout)
                 stderr = "\n".join(log.content for log in execution.logs.stderr)
@@ -131,7 +146,6 @@ class E2BRuntime(SandboxRuntime):
                 else:
                     exit_code = 0
 
-                artifacts = []
                 # 1. Native E2B artifacts (PNGs)
                 for result in execution.results:
                     if hasattr(result, "png") and result.png:
@@ -147,38 +161,16 @@ class E2BRuntime(SandboxRuntime):
                         stdout += f"\n[Result]: {result.text}"
 
             elif language == "bash":
-                try:
-                    cmd_result = await asyncio.wait_for(
-                        asyncio.to_thread(self.sandbox.commands.run, code),
-                        timeout=self.timeout,
-                    )
-                except asyncio.TimeoutError as e:
-                    logger.warning(f"Execution timed out ({self.timeout}s). " f"Restarting sandbox to cleanup process.")
-                    await self.terminate()
-                    await self.start()
-                    raise TimeoutError(f"Execution exceeded {self.timeout} seconds limit.") from e
-
+                cmd_result = await self._run_sdk_command(self.sandbox.commands.run, code)
                 stdout = cmd_result.stdout
                 stderr = cmd_result.stderr
                 exit_code = cmd_result.exit_code
-                artifacts = []
 
             elif language == "r":
-                try:
-                    cmd_result = await asyncio.wait_for(
-                        asyncio.to_thread(self.sandbox.commands.run, f"Rscript -e '{code}'"),
-                        timeout=self.timeout,
-                    )
-                except asyncio.TimeoutError as e:
-                    logger.warning(f"Execution timed out ({self.timeout}s). " f"Restarting sandbox to cleanup process.")
-                    await self.terminate()
-                    await self.start()
-                    raise TimeoutError(f"Execution exceeded {self.timeout} seconds limit.") from e
-
+                cmd_result = await self._run_sdk_command(self.sandbox.commands.run, f"Rscript -e '{code}'")
                 stdout = cmd_result.stdout
                 stderr = cmd_result.stderr
                 exit_code = cmd_result.exit_code
-                artifacts = []
 
             else:
                 raise ValueError(f"Unsupported language: {language}")
