@@ -36,6 +36,10 @@ class E2BRuntime(SandboxRuntime):
         """
         Boot the environment.
         """
+        if self.sandbox:
+            logger.warning("E2B sandbox already running. Terminating old session before restart.")
+            await self.terminate()
+
         logger.info(f"Starting E2B sandbox (template: {self.template})")
         try:
             self.sandbox = await asyncio.to_thread(
@@ -113,7 +117,10 @@ class E2BRuntime(SandboxRuntime):
                         timeout=self.timeout,
                     )
                 except asyncio.TimeoutError as e:
-                    logger.warning(f"Execution timed out ({self.timeout}s). " f"Restarting sandbox to cleanup process.")
+                    logger.warning(
+                        f"Execution timed out ({self.timeout}s). "
+                        f"Restarting sandbox to cleanup process."
+                    )
                     await self.terminate()
                     await self.start()
                     raise TimeoutError(f"Execution exceeded {self.timeout} seconds limit.") from e
@@ -149,7 +156,10 @@ class E2BRuntime(SandboxRuntime):
                         timeout=self.timeout,
                     )
                 except asyncio.TimeoutError as e:
-                    logger.warning(f"Execution timed out ({self.timeout}s). " f"Restarting sandbox to cleanup process.")
+                    logger.warning(
+                        f"Execution timed out ({self.timeout}s). "
+                        f"Restarting sandbox to cleanup process."
+                    )
                     await self.terminate()
                     await self.start()
                     raise TimeoutError(f"Execution exceeded {self.timeout} seconds limit.") from e
@@ -166,7 +176,10 @@ class E2BRuntime(SandboxRuntime):
                         timeout=self.timeout,
                     )
                 except asyncio.TimeoutError as e:
-                    logger.warning(f"Execution timed out ({self.timeout}s). " f"Restarting sandbox to cleanup process.")
+                    logger.warning(
+                        f"Execution timed out ({self.timeout}s). "
+                        f"Restarting sandbox to cleanup process."
+                    )
                     await self.terminate()
                     await self.start()
                     raise TimeoutError(f"Execution exceeded {self.timeout} seconds limit.") from e

@@ -1,6 +1,7 @@
-import time
 from typing import Any
 from unittest.mock import MagicMock, patch
+import time
+import asyncio
 
 import pytest
 from coreason_sandbox.runtimes.e2b import E2BRuntime
@@ -498,3 +499,137 @@ async def test_execute_r_timeout(e2b_runtime: E2BRuntime) -> None:
 
     with pytest.raises(TimeoutError, match="Execution exceeded 0.1 seconds limit"):
         await e2b_runtime.execute("Sys.sleep(10)", "r")
+
+
+@pytest.mark.asyncio
+async def test_start_idempotency_with_restart(e2b_runtime: E2BRuntime) -> None:
+    """Test that calling start() on a running sandbox terminates the old one first."""
+    assert e2b_runtime.sandbox is not None
+    old_sandbox = e2b_runtime.sandbox
+
+    # Mock close to verify it's called
+    old_sandbox.close = MagicMock()
+
+    # We need to mock Sandbox constructor again to return a NEW sandbox
+    with patch("coreason_sandbox.runtimes.e2b.E2BSandbox") as mock_new_sandbox_cls:
+        new_sandbox_mock = MagicMock()
+        new_sandbox_mock.sandbox_id = "new_id"
+        mock_new_sandbox_cls.return_value = new_sandbox_mock
+
+        await e2b_runtime.start()
+
+        # Verify old sandbox was closed
+        old_sandbox.close.assert_called_once()
+
+        # Verify new sandbox is set
+        assert e2b_runtime.sandbox == new_sandbox_mock
+        assert e2b_runtime.sandbox.sandbox_id == "new_id"
+
+
+@pytest.mark.asyncio
+async def test_execute_sequential_persistence(e2b_runtime: E2BRuntime) -> None:
+    """Verify multiple execute calls use the same sandbox instance."""
+    assert e2b_runtime.sandbox is not None
+    original_sandbox = e2b_runtime.sandbox
+
+    # Mock result 1
+    mock_exec1 = MagicMock()
+    mock_exec1.logs.stdout = [MagicMock(content="step1")]
+    mock_exec1.logs.stderr = []
+    mock_exec1.error = None
+    mock_exec1.results = []
+
+    # Mock result 2
+    mock_exec2 = MagicMock()
+    mock_exec2.logs.stdout = [MagicMock(content="step2")]
+    mock_exec2.logs.stderr = []
+    mock_exec2.error = None
+    mock_exec2.results = []
+
+    e2b_runtime.sandbox.run_code.side_effect = [mock_exec1, mock_exec2]
+
+    # Run 1
+    res1 = await e2b_runtime.execute("x=1", "python")
+    assert res1.stdout == "step1"
+
+    # Run 2
+    res2 = await e2b_runtime.execute("print(x)", "python")
+    assert res2.stdout == "step2"
+
+    # Verify sandbox instance didn't change
+    assert e2b_runtime.sandbox is original_sandbox
+    # Verify run_code called twice on same instance
+    assert e2b_runtime.sandbox.run_code.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_execute_error_persistence(e2b_runtime: E2BRuntime) -> None:
+    """Verify non-fatal error doesn't restart sandbox."""
+    assert e2b_runtime.sandbox is not None
+    original_sandbox = e2b_runtime.sandbox
+
+    # Mock error execution (e.g. syntax error)
+    mock_exec_err = MagicMock()
+    mock_exec_err.logs.stdout = []
+    mock_exec_err.logs.stderr = []
+    mock_exec_err.error = MagicMock(name="SyntaxError", value="invalid syntax", traceback="")
+    mock_exec_err.results = []
+
+    # Mock success execution
+    mock_exec_ok = MagicMock()
+    mock_exec_ok.logs.stdout = [MagicMock(content="ok")]
+    mock_exec_ok.logs.stderr = []
+    mock_exec_ok.error = None
+    mock_exec_ok.results = []
+
+    e2b_runtime.sandbox.run_code.side_effect = [mock_exec_err, mock_exec_ok]
+
+    # Run 1 (Error)
+    res1 = await e2b_runtime.execute("syntax error", "python")
+    assert res1.exit_code == 1
+
+    # Run 2 (OK)
+    res2 = await e2b_runtime.execute("print('ok')", "python")
+    assert res2.exit_code == 0
+
+    # Verify sandbox instance preserved
+    assert e2b_runtime.sandbox is original_sandbox
+
+
+@pytest.mark.asyncio
+async def test_concurrent_terminate_during_execute(e2b_runtime: E2BRuntime) -> None:
+    """Simulate terminate being called while execute is waiting."""
+    assert e2b_runtime.sandbox is not None
+    original_sandbox = e2b_runtime.sandbox
+
+    # Make run_code sleep to simulate long task
+    async def delayed_run_code(*args: Any, **kwargs: Any) -> Any:
+        await asyncio.sleep(0.2)
+        return MagicMock(logs=MagicMock(stdout=[], stderr=[]), error=None, results=[])
+
+    # We mock asyncio.to_thread in execute to call our async sleeper
+    # But execute uses asyncio.to_thread(self.sandbox.run_code, ...)
+    # which runs strictly in a thread.
+    # To simulate this test deterministically without real threads,
+    # we can just run execute and terminate concurrently.
+
+    e2b_runtime.sandbox.run_code.side_effect = lambda x: time.sleep(0.2) or MagicMock(
+        logs=MagicMock(stdout=[], stderr=[]), error=None, results=[]
+    )
+
+    # Start execute task
+    exec_task = asyncio.create_task(e2b_runtime.execute("sleep", "python"))
+
+    # Wait a bit then terminate
+    await asyncio.sleep(0.05)
+    await e2b_runtime.terminate()
+
+    # execute should finish (or fail if we mocked close to break run_code, but here it finishes)
+    # The main point is that no crash occurs and sandbox is None at end
+    result = await exec_task
+
+    assert e2b_runtime.sandbox is None
+    # Result might be success here because mock run_code finished successfully
+    # In real world, close() might cause run_code to throw, which execute would catch and re-raise.
+    # We validated that flow in other tests. Here we validate concurrency safety.
+    assert result.exit_code == 0
