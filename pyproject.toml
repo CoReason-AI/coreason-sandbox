@@ -17,6 +17,7 @@ e2b-code-interpreter = "^2.4.1"
 coreason-veritas = "^0.8.0"
 boto3 = "^1.42.33"
 mcp = "^1.25.0"
+packaging = "^26.0"
 
 [tool.poetry.scripts]
 coreason-sandbox = "coreason_sandbox.main:main"
@@ -74,6 +75,9 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 addopts = "--cov=src --cov-report=term-missing --cov-report=html --cov-fail-under=100"
 testpaths = ["tests"]
+markers = [
+    "live: marks tests as live integration tests (deselect with '-m \"not live\"')",
+]
 
 [tool.coverage.run]
 omit = ["tests/*"]
