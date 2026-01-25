@@ -76,14 +76,16 @@ async def test_install_package_download_failed(docker_runtime: Any) -> None:
     """Test re-raising RuntimeError from _download_and_package."""
     with patch(
         "coreason_sandbox.runtimes.docker.DockerRuntime._download_and_package",
-        side_effect=RuntimeError("Download fail"),
+        side_effect=RuntimeError("Download fail")
     ):
         with pytest.raises(RuntimeError, match="Download fail"):
             await docker_runtime.install_package("pandas")
 
 
 @pytest.mark.asyncio
-async def test_install_package_no_container() -> None:
+async def test_install_package_no_container(mock_docker_client: Any) -> None:
+    """Test installing package without a started container."""
+    # Ensure mock_docker_client is used to avoid real docker connection
     runtime = DockerRuntime()  # Not started
     with pytest.raises(RuntimeError, match="Sandbox not started"):
         await runtime.install_package("pandas")
@@ -117,7 +119,7 @@ def test_download_and_package_logic(docker_runtime: Any) -> None:
             # Ensure no platform args for linux
             assert "--platform" not in args
 
-        # Test 2: Non-Linux host (cross-platform path)
+        # Test 2: Non-Linux host (x86_64)
         with patch("platform.system", return_value="Darwin"), patch("platform.machine", return_value="x86_64"):
             docker_runtime._download_and_package(package_name)
 
@@ -125,7 +127,15 @@ def test_download_and_package_logic(docker_runtime: Any) -> None:
             assert "--platform" in args
             assert "manylinux2014_x86_64" in args
 
-        # Test 3: Subprocess failure
+        # Test 3: Non-Linux host (ARM/aarch64)
+        with patch("platform.system", return_value="Darwin"), patch("platform.machine", return_value="arm64"):
+            docker_runtime._download_and_package(package_name)
+
+            args = mock_run.call_args[0][0]
+            assert "--platform" in args
+            assert "manylinux2014_aarch64" in args
+
+        # Test 4: Subprocess failure
         mock_run.side_effect = subprocess.CalledProcessError(1, cmd="pip", stderr="Fail")
         with pytest.raises(RuntimeError, match="Failed to download package"):
             docker_runtime._download_and_package(package_name)
