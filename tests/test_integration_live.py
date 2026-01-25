@@ -3,11 +3,12 @@ from typing import AsyncGenerator
 
 import docker
 import pytest
+import pytest_asyncio
 from coreason_sandbox.models import ExecutionResult
 from coreason_sandbox.runtimes.docker import DockerRuntime
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def live_docker_runtime() -> AsyncGenerator[DockerRuntime, None]:
     """
     Fixture to provide a started DockerRuntime for live tests.
@@ -111,13 +112,12 @@ async def test_docker_isolation_live(live_docker_runtime: DockerRuntime) -> None
     Starts a SECOND runtime to ensure it's distinct from the fixture's runtime.
     """
     runtime1 = live_docker_runtime
-
-    # Start Runtime 2 manually (fixture pattern implies single instance per test usually,
-    # but we can instantiate another for this specific test)
-    # Reuse logic? We'll just instantiate directly.
-    runtime2 = DockerRuntime(image="python:3.12-slim", timeout=30.0)
+    runtime2 = None
 
     try:
+        # Instantiate inside try block to catch init failures (e.g. socket missing)
+        runtime2 = DockerRuntime(image="python:3.12-slim", timeout=30.0)
+
         await runtime2.start()
 
         # Verify different containers
@@ -137,4 +137,5 @@ async def test_docker_isolation_live(live_docker_runtime: DockerRuntime) -> None
         # We might skip here if it's an overlayfs error etc.
         pytest.skip(f"Second container failed (Environment Issue): {e}")
     finally:
-        await runtime2.terminate()
+        if runtime2:
+            await runtime2.terminate()
