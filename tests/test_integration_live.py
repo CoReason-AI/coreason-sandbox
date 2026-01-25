@@ -42,6 +42,8 @@ async def test_docker_runtime_live_lifecycle() -> None:
         assert result_bash.exit_code == 0
         assert "Hello Bash" in result_bash.stdout.strip()
 
+    except docker.errors.ImageNotFound as e:
+        pytest.skip(f"Docker image not found/pull failed (Environment Issue): {e}")
     except docker.errors.APIError as e:
         # Check for the specific overlayfs error common in some CI/Sandboxes
         if "failed to mount" in str(e) and "overlay" in str(e):
