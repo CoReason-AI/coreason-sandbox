@@ -37,6 +37,7 @@ class SandboxFactory:
             )
         elif config.runtime == "e2b":
             return E2BRuntime(
+                api_key=config.e2b_api_key,
                 timeout=config.execution_timeout,
                 artifact_manager=artifact_manager,
             )

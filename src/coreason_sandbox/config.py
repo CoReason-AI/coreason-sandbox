@@ -21,6 +21,9 @@ class SandboxConfig(BaseSettings):
     idle_timeout: float = 300.0  # 5 minutes
     reaper_interval: float = 60.0  # Check every minute
 
+    # E2B Configuration
+    e2b_api_key: str | None = None
+
     # S3 / Object Storage
     s3_bucket: str | None = None
     s3_region: str | None = None
