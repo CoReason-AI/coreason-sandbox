@@ -51,7 +51,7 @@ async def test_docker_runtime_live_lifecycle() -> None:
     except docker.errors.DockerException as e:
         # Catch unexpected docker errors during execution
         if "Connection aborted" in str(e) or "FileNotFoundError" in str(e):
-             pytest.skip(f"Docker connection lost (Environment Issue): {e}")
+            pytest.skip(f"Docker connection lost (Environment Issue): {e}")
         else:
             raise
     finally:
