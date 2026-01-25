@@ -18,6 +18,7 @@ class VeritasIntegrator:
     def __init__(self, service_name: str = "coreason-sandbox", enabled: bool = True):
         # Only enable if config says YES and library is present
         self.enabled = enabled and (IERLogger is not None)
+        self.logger = None
 
         if self.enabled:
             try:
@@ -33,7 +34,7 @@ class VeritasIntegrator:
         # Generate hash
         code_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
 
-        if self.enabled:
+        if self.enabled and self.logger:
             try:
                 await self.logger.log_event(
                     event_type="SANDBOX_EXECUTION_START",
