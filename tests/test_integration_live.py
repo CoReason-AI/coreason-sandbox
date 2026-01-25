@@ -11,8 +11,13 @@ async def test_docker_runtime_live_lifecycle() -> None:
     Live integration test for DockerRuntime.
     Verifies: Start -> Execute -> Terminate on a REAL container.
     """
-    # Use standard image available in CI/Dev environments
-    runtime = DockerRuntime(image="python:3.12-slim", timeout=30.0)
+    try:
+        # Use standard image available in CI/Dev environments
+        # Initialization can fail if Docker daemon is not running (DockerException)
+        runtime = DockerRuntime(image="python:3.12-slim", timeout=30.0)
+    except docker.errors.DockerException as e:
+        pytest.skip(f"Docker Daemon unreachable (Environment Issue): {e}")
+        return
 
     try:
         # 1. Start
@@ -41,6 +46,12 @@ async def test_docker_runtime_live_lifecycle() -> None:
         # Check for the specific overlayfs error common in some CI/Sandboxes
         if "failed to mount" in str(e) and "overlay" in str(e):
             pytest.skip(f"Docker Daemon reachable but failed to mount filesystem (Environment Issue): {e}")
+        else:
+            raise
+    except docker.errors.DockerException as e:
+        # Catch unexpected docker errors during execution
+        if "Connection aborted" in str(e) or "FileNotFoundError" in str(e):
+             pytest.skip(f"Docker connection lost (Environment Issue): {e}")
         else:
             raise
     finally:
