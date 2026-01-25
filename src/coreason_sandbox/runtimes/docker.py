@@ -2,7 +2,6 @@ import asyncio
 import io
 import os
 import platform
-import re
 import subprocess
 import sys
 import tarfile
@@ -15,6 +14,7 @@ import docker
 from docker.errors import DockerException
 from docker.models.containers import Container
 from loguru import logger
+from packaging.requirements import Requirement
 
 from coreason_sandbox.models import ExecutionResult, FileReference
 from coreason_sandbox.runtime import SandboxRuntime
@@ -165,9 +165,11 @@ class DockerRuntime(SandboxRuntime):
         if not self.container:
             raise RuntimeError("Sandbox not started")
 
-        # Parse package name to remove version specifiers (e.g., pandas==2.0 -> pandas)
-        # Regex to split on common version specifiers: ==, >=, <=, >, <, ~=, ;, @
-        base_package_name = re.split(r"[=<>]|~|;|@", package_name)[0].strip().lower()
+        try:
+            req = Requirement(package_name)
+            base_package_name = req.name.lower()
+        except Exception as e:
+            raise ValueError(f"Invalid package requirement: {package_name}") from e
 
         # Normalize allowlist to lowercase for check
         allowed_lower = {p.lower() for p in self.allowed_packages}
