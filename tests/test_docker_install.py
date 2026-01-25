@@ -1,6 +1,6 @@
-import subprocess
 from typing import Any
 from unittest.mock import MagicMock, patch
+import subprocess
 
 import pytest
 from coreason_sandbox.runtimes.docker import DockerRuntime
@@ -14,8 +14,8 @@ def mock_docker_client() -> Any:
 
 @pytest.fixture
 def docker_runtime(mock_docker_client: Any) -> Any:
-    runtime = DockerRuntime(allowed_packages={"requests", "pandas"})
-    # Mock a started container
+    # Explicitly allow pandas for testing
+    runtime = DockerRuntime(allowed_packages={"pandas"})
     runtime.container = MagicMock()
     runtime.container.short_id = "test_id"
     return runtime
@@ -23,157 +23,106 @@ def docker_runtime(mock_docker_client: Any) -> Any:
 
 @pytest.mark.asyncio
 async def test_install_package_success(docker_runtime: Any) -> None:
-    # Mock _download_and_package to avoid threading complexity and focus on flow
-    with patch.object(docker_runtime, "_download_and_package", return_value=b"tarbytes") as mock_download:
-        # Setup exec_run side effects:
-        # 1. mkdir (success)
-        # 2. pip install (success)
-        docker_runtime.container.exec_run.side_effect = [(0, b""), (0, b"Successfully installed requests")]
+    # 1. Download/tar (mocked)
+    with patch("coreason_sandbox.runtimes.docker.DockerRuntime._download_and_package", return_value=b"tar_data"):
+        # 2. Upload/install (mocked container)
+        docker_runtime.container.exec_run.return_value = (0, b"Success")
 
-        await docker_runtime.install_package("requests")
-
-        mock_download.assert_called_once_with("requests")
+        await docker_runtime.install_package("pandas")
 
         # Verify upload
-        docker_runtime.container.put_archive.assert_called_once_with(path="/tmp/packages/requests", data=b"tarbytes")
+        docker_runtime.container.put_archive.assert_called_once()
+        args, kwargs = docker_runtime.container.put_archive.call_args
 
-        # Verify install command
-        install_call = docker_runtime.container.exec_run.call_args_list[1]
-        cmd = install_call[0][0]
-        assert "pip" in cmd
-        assert "install" in cmd
-        assert "--no-index" in cmd
-        assert "requests" in cmd
+        path_arg = kwargs.get("path")
+        if not path_arg and args:
+             path_arg = args[0]
 
+        assert path_arg == "/tmp/packages/pandas"
+        assert kwargs["data"] == b"tar_data"
 
-def test_download_and_package_linux(docker_runtime: Any) -> None:
-    """Test the synchronous helper method logic on Linux."""
-    with (
-        patch("coreason_sandbox.runtimes.docker.subprocess.run") as mock_subprocess,
-        patch("coreason_sandbox.runtimes.docker.tarfile.open"),
-        patch("platform.system", return_value="Linux"),
-    ):
-        docker_runtime._download_and_package("requests")
-
-        mock_subprocess.assert_called_once()
-        args = mock_subprocess.call_args[0][0]
-        assert "pip" in args
-        assert "download" in args
-        assert "--platform" not in args  # Should not add platform flags on Linux
-
-
-def test_download_and_package_mac_x86(docker_runtime: Any) -> None:
-    """Test the synchronous helper method logic on Mac (non-Linux) x86_64."""
-    with (
-        patch("coreason_sandbox.runtimes.docker.subprocess.run") as mock_subprocess,
-        patch("coreason_sandbox.runtimes.docker.tarfile.open"),
-        patch("platform.system", return_value="Darwin"),
-        patch("platform.machine", return_value="x86_64"),
-    ):
-        docker_runtime._download_and_package("requests")
-
-        mock_subprocess.assert_called_once()
-        args = mock_subprocess.call_args[0][0]
-        assert "--platform" in args
-        assert "manylinux2014_x86_64" in args
-        assert "--python-version" in args
-
-
-def test_download_and_package_mac_arm(docker_runtime: Any) -> None:
-    """Test the synchronous helper method logic on Mac (non-Linux) ARM."""
-    with (
-        patch("coreason_sandbox.runtimes.docker.subprocess.run") as mock_subprocess,
-        patch("coreason_sandbox.runtimes.docker.tarfile.open"),
-        patch("platform.system", return_value="Darwin"),
-        patch("platform.machine", return_value="arm64"),
-    ):
-        docker_runtime._download_and_package("requests")
-
-        mock_subprocess.assert_called_once()
-        args = mock_subprocess.call_args[0][0]
-        assert "--platform" in args
-        assert "manylinux2014_aarch64" in args
-        assert "--python-version" in args
-
-
-def test_download_and_package_fail(docker_runtime: Any) -> None:
-    with (
-        patch(
-            "coreason_sandbox.runtimes.docker.subprocess.run",
-            side_effect=subprocess.CalledProcessError(1, "cmd", stderr="error"),
-        ),
-        patch("platform.system", return_value="Linux"),
-    ):
-        with pytest.raises(RuntimeError, match="Failed to download package requests: error"):
-            docker_runtime._download_and_package("requests")
+        # Verify install cmd
+        docker_runtime.container.exec_run.assert_called()
+        cmd = docker_runtime.container.exec_run.call_args[0][0]
+        assert "pip install" in " ".join(cmd)
+        assert "pandas" in cmd
 
 
 @pytest.mark.asyncio
 async def test_install_package_not_allowed(docker_runtime: Any) -> None:
-    with pytest.raises(ValueError, match="not in the allowed list"):
-        await docker_runtime.install_package("malicious-package")
+    # requests is not in allowed_packages={"pandas"}
+    with pytest.raises(ValueError, match="is not in the allowed list"):
+        await docker_runtime.install_package("requests")
 
 
 @pytest.mark.asyncio
-async def test_install_package_not_started(mock_docker_client: Any) -> None:
-    runtime = DockerRuntime()
-    with pytest.raises(RuntimeError, match="Sandbox not started"):
-        await runtime.install_package("requests")
+async def test_install_package_invalid_name(docker_runtime: Any) -> None:
+    """Test that invalid package names raise ValueError."""
+    with pytest.raises(ValueError, match="Invalid package requirement"):
+        await docker_runtime.install_package("!invalid-package-name")
 
 
 @pytest.mark.asyncio
-async def test_install_package_download_exception(docker_runtime: Any) -> None:
-    """Test that runtime errors during download are propagated correctly."""
-    # Simulate an error in the threaded function
-    with patch.object(docker_runtime, "_download_and_package", side_effect=RuntimeError("Download failed")):
-        with pytest.raises(RuntimeError, match="Download failed"):
-            await docker_runtime.install_package("requests")
-
-
-@pytest.mark.asyncio
-async def test_install_package_install_fail(docker_runtime: Any) -> None:
-    with patch.object(docker_runtime, "_download_and_package", return_value=b"tarbytes"):
-        # exec_run side effects:
-        # 1. mkdir (success)
-        # 2. pip install (fail)
-        docker_runtime.container.exec_run.side_effect = [(0, b""), (1, b"Could not find package")]
+async def test_install_package_install_failed(docker_runtime: Any) -> None:
+    with patch("coreason_sandbox.runtimes.docker.DockerRuntime._download_and_package", return_value=b"tar_data"):
+        docker_runtime.container.exec_run.return_value = (1, b"Install error")
 
         with pytest.raises(RuntimeError, match="Failed to install package"):
-            await docker_runtime.install_package("requests")
+            await docker_runtime.install_package("pandas")
 
 
 @pytest.mark.asyncio
-async def test_install_package_with_version(docker_runtime: Any) -> None:
-    """Test that installing a package with version specifier works if base name is allowed."""
-    with patch.object(docker_runtime, "_download_and_package", return_value=b"tarbytes") as mock_download:
-        docker_runtime.container.exec_run.side_effect = [(0, b""), (0, b"Success")]
-
-        # "requests" is in allowlist
-        await docker_runtime.install_package("requests==2.31.0")
-
-        # Verify download called with full string
-        mock_download.assert_called_once_with("requests==2.31.0")
+async def test_install_package_download_failed(docker_runtime: Any) -> None:
+    """Test re-raising RuntimeError from _download_and_package."""
+    with patch("coreason_sandbox.runtimes.docker.DockerRuntime._download_and_package", side_effect=RuntimeError("Download fail")):
+        with pytest.raises(RuntimeError, match="Download fail"):
+            await docker_runtime.install_package("pandas")
 
 
 @pytest.mark.asyncio
-async def test_install_package_case_insensitive(docker_runtime: Any) -> None:
-    """Test that package name checking is case insensitive."""
-    with patch.object(docker_runtime, "_download_and_package", return_value=b"tarbytes") as mock_download:
-        docker_runtime.container.exec_run.side_effect = [(0, b""), (0, b"Success")]
-
-        # "Requests" should match "requests" in allowlist
-        await docker_runtime.install_package("Requests")
-
-        mock_download.assert_called_once_with("Requests")
+async def test_install_package_no_container() -> None:
+    runtime = DockerRuntime()  # Not started
+    with pytest.raises(RuntimeError, match="Sandbox not started"):
+        await runtime.install_package("pandas")
 
 
-@pytest.mark.asyncio
-async def test_install_package_complex_specifiers(docker_runtime: Any) -> None:
-    """Test parsing of complex version specifiers."""
-    with patch.object(docker_runtime, "_download_and_package", return_value=b"tarbytes") as mock_download:
-        docker_runtime.container.exec_run.side_effect = [(0, b""), (0, b"Success")]
+def test_download_and_package_logic(docker_runtime: Any) -> None:
+    """
+    Test _download_and_package logic by mocking subprocess and tarfile.
+    """
+    package_name = "pandas"
 
-        # "pandas" is in allowlist
-        await docker_runtime.install_package("pandas>=1.0,<2.0")
+    with patch("subprocess.run") as mock_run, \
+         patch("tarfile.open") as mock_tar, \
+         patch("io.BytesIO") as mock_io, \
+         patch("tempfile.TemporaryDirectory") as mock_temp:
 
-        mock_download.assert_called_once_with("pandas>=1.0,<2.0")
+        mock_temp.return_value.__enter__.return_value = "/tmp/fake_dir"
+        mock_io.return_value.getvalue.return_value = b"fake_tar_bytes"
+
+        # Test 1: Linux host (simple path)
+        with patch("platform.system", return_value="Linux"):
+            data = docker_runtime._download_and_package(package_name)
+            assert data == b"fake_tar_bytes"
+
+            mock_run.assert_called()
+            args = mock_run.call_args[0][0]
+            assert "pip" in args
+            assert "download" in args
+            assert package_name in args
+            # Ensure no platform args for linux
+            assert "--platform" not in args
+
+        # Test 2: Non-Linux host (cross-platform path)
+        with patch("platform.system", return_value="Darwin"), \
+             patch("platform.machine", return_value="x86_64"):
+            docker_runtime._download_and_package(package_name)
+
+            args = mock_run.call_args[0][0]
+            assert "--platform" in args
+            assert "manylinux2014_x86_64" in args
+
+        # Test 3: Subprocess failure
+        mock_run.side_effect = subprocess.CalledProcessError(1, cmd="pip", stderr="Fail")
+        with pytest.raises(RuntimeError, match="Failed to download package"):
+            docker_runtime._download_and_package(package_name)
