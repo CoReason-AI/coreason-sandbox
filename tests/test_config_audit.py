@@ -20,7 +20,7 @@ def test_audit_logging_enabled_mock() -> None:
 
     with patch.dict("sys.modules", {"coreason_veritas.auditor": mock_module}):
         # Need to re-import or patch where it's used
-        with patch("coreason_sandbox.utils.veritas.IERLogger", mock_logger_class):
+        with patch("coreason_sandbox.integrations.veritas.IERLogger", mock_logger_class):
             config = SandboxConfig(enable_audit_logging=True)
             mcp = SandboxMCP(config)
             assert mcp.veritas.enabled is True
@@ -30,7 +30,7 @@ def test_audit_logging_enabled_mock() -> None:
 def test_audit_logging_enabled_but_missing_lib() -> None:
     """Test enabled in config but library missing -> disabled."""
     # Ensure import fails or IERLogger is None
-    with patch("coreason_sandbox.utils.veritas.IERLogger", None):
+    with patch("coreason_sandbox.integrations.veritas.IERLogger", None):
         config = SandboxConfig(enable_audit_logging=True)
         mcp = SandboxMCP(config)
         assert mcp.veritas.enabled is False

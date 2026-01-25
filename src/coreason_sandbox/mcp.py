@@ -15,9 +15,8 @@ from typing import Any, Literal
 from loguru import logger
 
 from coreason_sandbox.config import SandboxConfig
+from coreason_sandbox.integrations.veritas import VeritasIntegrator
 from coreason_sandbox.session_manager import Session, SessionManager
-from coreason_sandbox.utils.vault import VaultIntegrator
-from coreason_sandbox.utils.veritas import VeritasIntegrator
 
 
 class SandboxMCP:
@@ -30,27 +29,8 @@ class SandboxMCP:
     def __init__(self, config: SandboxConfig | None = None):
         self.config = config or SandboxConfig()
 
-        # Vault Integration
-        self.vault = VaultIntegrator()
-        self._hydrate_config_from_vault()
-
         self.veritas = VeritasIntegrator(enabled=self.config.enable_audit_logging)
         self.session_manager = SessionManager(self.config)
-
-    def _hydrate_config_from_vault(self) -> None:
-        """
-        Fetch secrets from Vault and update config if found.
-        """
-        secrets_map = {
-            "e2b_api_key": "E2B_API_KEY",
-            "s3_access_key": "S3_ACCESS_KEY",
-            "s3_secret_key": "S3_SECRET_KEY",
-        }
-
-        for config_field, vault_key in secrets_map.items():
-            secret = self.vault.get_secret(vault_key)
-            if secret:
-                setattr(self.config, config_field, secret)
 
     @property
     def sessions(self) -> dict[str, Session]:

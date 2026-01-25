@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from coreason_sandbox.config import SandboxConfig
+from coreason_sandbox.integrations.veritas import VeritasIntegrator
 from coreason_sandbox.mcp import SandboxMCP
-from coreason_sandbox.utils.veritas import VeritasIntegrator
 
 
 @pytest.fixture
@@ -14,7 +14,7 @@ def mock_ier_logger() -> Any:
     mock_module.IERLogger = mock_logger_class
 
     with patch.dict("sys.modules", {"coreason_veritas.auditor": mock_module}):
-        with patch("coreason_sandbox.utils.veritas.IERLogger", mock_logger_class):
+        with patch("coreason_sandbox.integrations.veritas.IERLogger", mock_logger_class):
             yield mock_logger_class
 
 

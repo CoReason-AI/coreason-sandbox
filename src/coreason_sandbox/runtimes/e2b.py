@@ -8,9 +8,9 @@ from typing import Any, Callable, Literal, TypeVar
 from e2b_code_interpreter import Sandbox as E2BSandbox
 from loguru import logger
 
+from coreason_sandbox.artifacts import ArtifactManager
 from coreason_sandbox.models import ExecutionResult, FileReference
 from coreason_sandbox.runtime import SandboxRuntime
-from coreason_sandbox.utils.artifacts import ArtifactManager
 
 T = TypeVar("T")
 

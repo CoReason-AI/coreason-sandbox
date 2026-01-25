@@ -1,9 +1,9 @@
+from coreason_sandbox.artifacts import ArtifactManager
 from coreason_sandbox.config import SandboxConfig
 from coreason_sandbox.runtime import SandboxRuntime
 from coreason_sandbox.runtimes.docker import DockerRuntime
 from coreason_sandbox.runtimes.e2b import E2BRuntime
-from coreason_sandbox.utils.artifacts import ArtifactManager
-from coreason_sandbox.utils.storage import S3Storage
+from coreason_sandbox.storage import S3Storage
 
 
 class SandboxFactory:
@@ -31,6 +31,7 @@ class SandboxFactory:
 
         if config.runtime == "docker":
             return DockerRuntime(
+                image=config.docker_image,
                 allowed_packages=config.allowed_packages,
                 timeout=config.execution_timeout,
                 artifact_manager=artifact_manager,

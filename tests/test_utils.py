@@ -10,7 +10,7 @@
 
 from pathlib import Path
 
-from coreason_sandbox.utils.logger import logger
+from coreason_sandbox.logger import logger
 
 
 def test_logger_initialization() -> None:
