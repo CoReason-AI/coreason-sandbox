@@ -20,6 +20,7 @@ class SandboxConfig(BaseSettings):
     execution_timeout: float = 60.0
     idle_timeout: float = 300.0  # 5 minutes
     reaper_interval: float = 60.0  # Check every minute
+    enable_audit_logging: bool = True
 
     # E2B Configuration
     e2b_api_key: str | None = None

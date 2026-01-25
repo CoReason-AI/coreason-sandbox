@@ -34,7 +34,7 @@ class SandboxMCP:
         self.vault = VaultIntegrator()
         self._hydrate_config_from_vault()
 
-        self.veritas = VeritasIntegrator()
+        self.veritas = VeritasIntegrator(enabled=self.config.enable_audit_logging)
         self.session_manager = SessionManager(self.config)
 
     def _hydrate_config_from_vault(self) -> None:
