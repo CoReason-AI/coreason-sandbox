@@ -1,6 +1,6 @@
+import subprocess
 from typing import Any
 from unittest.mock import MagicMock, patch
-import subprocess
 
 import pytest
 from coreason_sandbox.runtimes.docker import DockerRuntime
@@ -36,7 +36,7 @@ async def test_install_package_success(docker_runtime: Any) -> None:
 
         path_arg = kwargs.get("path")
         if not path_arg and args:
-             path_arg = args[0]
+            path_arg = args[0]
 
         assert path_arg == "/tmp/packages/pandas"
         assert kwargs["data"] == b"tar_data"
@@ -74,7 +74,10 @@ async def test_install_package_install_failed(docker_runtime: Any) -> None:
 @pytest.mark.asyncio
 async def test_install_package_download_failed(docker_runtime: Any) -> None:
     """Test re-raising RuntimeError from _download_and_package."""
-    with patch("coreason_sandbox.runtimes.docker.DockerRuntime._download_and_package", side_effect=RuntimeError("Download fail")):
+    with patch(
+        "coreason_sandbox.runtimes.docker.DockerRuntime._download_and_package",
+        side_effect=RuntimeError("Download fail"),
+    ):
         with pytest.raises(RuntimeError, match="Download fail"):
             await docker_runtime.install_package("pandas")
 
@@ -92,11 +95,12 @@ def test_download_and_package_logic(docker_runtime: Any) -> None:
     """
     package_name = "pandas"
 
-    with patch("subprocess.run") as mock_run, \
-         patch("tarfile.open") as mock_tar, \
-         patch("io.BytesIO") as mock_io, \
-         patch("tempfile.TemporaryDirectory") as mock_temp:
-
+    with (
+        patch("subprocess.run") as mock_run,
+        patch("tarfile.open"),
+        patch("io.BytesIO") as mock_io,
+        patch("tempfile.TemporaryDirectory") as mock_temp,
+    ):
         mock_temp.return_value.__enter__.return_value = "/tmp/fake_dir"
         mock_io.return_value.getvalue.return_value = b"fake_tar_bytes"
 
@@ -114,8 +118,7 @@ def test_download_and_package_logic(docker_runtime: Any) -> None:
             assert "--platform" not in args
 
         # Test 2: Non-Linux host (cross-platform path)
-        with patch("platform.system", return_value="Darwin"), \
-             patch("platform.machine", return_value="x86_64"):
+        with patch("platform.system", return_value="Darwin"), patch("platform.machine", return_value="x86_64"):
             docker_runtime._download_and_package(package_name)
 
             args = mock_run.call_args[0][0]
