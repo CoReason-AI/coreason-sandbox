@@ -76,7 +76,7 @@ async def test_install_package_download_failed(docker_runtime: Any) -> None:
     """Test re-raising RuntimeError from _download_and_package."""
     with patch(
         "coreason_sandbox.runtimes.docker.DockerRuntime._download_and_package",
-        side_effect=RuntimeError("Download fail")
+        side_effect=RuntimeError("Download fail"),
     ):
         with pytest.raises(RuntimeError, match="Download fail"):
             await docker_runtime.install_package("pandas")
