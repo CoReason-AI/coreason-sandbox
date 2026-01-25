@@ -1,7 +1,8 @@
-import pytest
 import docker
-from coreason_sandbox.runtimes.docker import DockerRuntime
+import pytest
 from coreason_sandbox.models import ExecutionResult
+from coreason_sandbox.runtimes.docker import DockerRuntime
+
 
 @pytest.mark.live
 @pytest.mark.asyncio
