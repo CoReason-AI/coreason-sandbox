@@ -1,20 +1,12 @@
+from typing import AsyncGenerator
+
+import docker
 import pytest
 import pytest_asyncio
-from typing import AsyncGenerator
-import docker
 from coreason_sandbox.runtimes.docker import DockerRuntime
-from coreason_sandbox.models import ExecutionResult
 
-# Re-use the live fixture logic, but local to this file to avoid import issues or dependency on conftest structure changes
-# (Though ideally we should use the conftest fixture if available. Let's assume conftest.py's fixtures are available if we are in the same package context,
-# but for clarity and isolation I'll define a specialized one or use the one from test_integration_live via import if possible,
-# or just redefine it to be self-contained.)
+# test_integration_live via import if possible, or just redefine it to be self-contained.)
 
-# Using the fixture from conftest.py if it exists globally, otherwise redefine.
-# Since test_integration_live.py defined 'live_docker_runtime' locally, it might not be shared.
-# Let's verify conftest.py content first.
-
-# Checking conftest.py content first is safer, but assuming I can just copy the logic for now to ensure robustness.
 
 @pytest_asyncio.fixture
 async def filesystem_docker_runtime() -> AsyncGenerator[DockerRuntime, None]:
@@ -28,6 +20,7 @@ async def filesystem_docker_runtime() -> AsyncGenerator[DockerRuntime, None]:
     finally:
         if runtime:
             await runtime.terminate()
+
 
 @pytest.mark.live
 @pytest.mark.asyncio
@@ -51,6 +44,7 @@ async def test_verify_user_identity(filesystem_docker_runtime: DockerRuntime) ->
     # The uid for a created user is usually 1000, ensuring it's not 0 (root)
     assert res_id.stdout.strip() != "0"
 
+
 @pytest.mark.live
 @pytest.mark.asyncio
 async def test_working_directory_default(filesystem_docker_runtime: DockerRuntime) -> None:
@@ -67,6 +61,7 @@ async def test_working_directory_default(filesystem_docker_runtime: DockerRuntim
     assert res_py.exit_code == 0
     assert res_py.stdout.strip() == "/home/user"
 
+
 @pytest.mark.live
 @pytest.mark.asyncio
 async def test_permission_boundaries(filesystem_docker_runtime: DockerRuntime) -> None:
@@ -76,11 +71,13 @@ async def test_permission_boundaries(filesystem_docker_runtime: DockerRuntime) -
     # Attempt to write to /root
     res_root = await runtime.execute("touch /root/hack.txt", "bash")
     assert res_root.exit_code != 0
+    # Different systems report perm denied differently in stderr/stdout/exit code
     assert "Permission denied" in res_root.stderr or "Permission denied" in res_root.stdout or res_root.exit_code == 1
 
     # Attempt to write to /usr
     res_usr = await runtime.execute("touch /usr/hack.txt", "bash")
     assert res_usr.exit_code != 0
+
 
 @pytest.mark.live
 @pytest.mark.asyncio
@@ -101,6 +98,7 @@ async def test_subdirectory_persistence_and_listing(filesystem_docker_runtime: D
     # 4. Verify Content
     res_cat = await runtime.execute("cat subdir/nested/file.txt", "bash")
     assert res_cat.stdout.strip() == "secret"
+
 
 @pytest.mark.live
 @pytest.mark.asyncio

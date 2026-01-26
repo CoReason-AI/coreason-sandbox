@@ -1,5 +1,5 @@
 import os
-from typing import Protocol, runtime_checkable
+from typing import Any
 
 from loguru import logger
 
@@ -10,7 +10,7 @@ class VaultIntegrator:
     Removes dependency on coreason-vault.
     """
 
-    def __init__(self, client=None):
+    def __init__(self, client: Any | None = None) -> None:
         # Client is ignored in standalone mode
         pass
 

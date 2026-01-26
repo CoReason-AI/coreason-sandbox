@@ -1,5 +1,6 @@
-from unittest.mock import patch, MagicMock
-from coreason_sandbox.config import SandboxConfig, VaultSettingsSource
+from unittest.mock import patch
+
+from coreason_sandbox.config import SandboxConfig
 
 
 def test_vault_settings_source_injects_secrets() -> None:
