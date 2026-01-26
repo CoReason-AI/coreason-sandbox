@@ -13,18 +13,18 @@ async def built_docker_image() -> AsyncGenerator[str, None]:
     Builds the Docker image from the project Dockerfile for testing.
     Returns the image tag.
     """
-    client = docker.from_env()
     image_tag = "coreason-sandbox-test:latest"
 
     try:
+        client = docker.from_env()
         # Build image
         # This assumes the test is run from the project root
         project_root = os.getcwd()
         print(f"Building Docker image from {project_root}...")
         client.images.build(path=project_root, dockerfile="Dockerfile", tag=image_tag, rm=True)
         yield image_tag
-    except (docker.errors.BuildError, docker.errors.APIError) as e:
-        pytest.skip(f"Failed to build Docker image: {e}")
+    except (docker.errors.BuildError, docker.errors.APIError, docker.errors.DockerException) as e:
+        pytest.skip(f"Failed to build/connect Docker: {e}")
     finally:
         # Cleanup if needed (optional, keeping it cached is faster)
         pass
