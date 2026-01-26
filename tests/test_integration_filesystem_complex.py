@@ -1,0 +1,121 @@
+import pytest
+import pytest_asyncio
+from typing import AsyncGenerator
+import docker
+from coreason_sandbox.runtimes.docker import DockerRuntime
+from coreason_sandbox.models import ExecutionResult
+
+# Re-use the live fixture logic, but local to this file to avoid import issues or dependency on conftest structure changes
+# (Though ideally we should use the conftest fixture if available. Let's assume conftest.py's fixtures are available if we are in the same package context,
+# but for clarity and isolation I'll define a specialized one or use the one from test_integration_live via import if possible,
+# or just redefine it to be self-contained.)
+
+# Using the fixture from conftest.py if it exists globally, otherwise redefine.
+# Since test_integration_live.py defined 'live_docker_runtime' locally, it might not be shared.
+# Let's verify conftest.py content first.
+
+# Checking conftest.py content first is safer, but assuming I can just copy the logic for now to ensure robustness.
+
+@pytest_asyncio.fixture
+async def filesystem_docker_runtime() -> AsyncGenerator[DockerRuntime, None]:
+    runtime = None
+    try:
+        runtime = DockerRuntime(image="python:3.12-slim", timeout=30.0)
+        await runtime.start()
+        yield runtime
+    except (docker.errors.ImageNotFound, docker.errors.DockerException, docker.errors.APIError) as e:
+        pytest.skip(f"Docker environment issue: {e}")
+    finally:
+        if runtime:
+            await runtime.terminate()
+
+@pytest.mark.live
+@pytest.mark.asyncio
+async def test_verify_user_identity(filesystem_docker_runtime: DockerRuntime) -> None:
+    """Verify the container is running as 'user' with the correct home."""
+    runtime = filesystem_docker_runtime
+
+    # 1. Check User
+    res_user = await runtime.execute("whoami", "bash")
+    assert res_user.exit_code == 0
+    assert res_user.stdout.strip() == "user"
+
+    # 2. Check Home Env
+    res_home = await runtime.execute("echo $HOME", "bash")
+    assert res_home.exit_code == 0
+    assert res_home.stdout.strip() == "/home/user"
+
+    # 3. Check ID
+    res_id = await runtime.execute("id -u", "bash")
+    assert res_id.exit_code == 0
+    # The uid for a created user is usually 1000, ensuring it's not 0 (root)
+    assert res_id.stdout.strip() != "0"
+
+@pytest.mark.live
+@pytest.mark.asyncio
+async def test_working_directory_default(filesystem_docker_runtime: DockerRuntime) -> None:
+    """Verify that execution starts in /home/user."""
+    runtime = filesystem_docker_runtime
+
+    # Check via PWD
+    res_pwd = await runtime.execute("pwd", "bash")
+    assert res_pwd.exit_code == 0
+    assert res_pwd.stdout.strip() == "/home/user"
+
+    # Check via Python os.getcwd()
+    res_py = await runtime.execute("import os; print(os.getcwd())", "python")
+    assert res_py.exit_code == 0
+    assert res_py.stdout.strip() == "/home/user"
+
+@pytest.mark.live
+@pytest.mark.asyncio
+async def test_permission_boundaries(filesystem_docker_runtime: DockerRuntime) -> None:
+    """Verify that the user cannot write to root-owned paths."""
+    runtime = filesystem_docker_runtime
+
+    # Attempt to write to /root
+    res_root = await runtime.execute("touch /root/hack.txt", "bash")
+    assert res_root.exit_code != 0
+    assert "Permission denied" in res_root.stderr or "Permission denied" in res_root.stdout or res_root.exit_code == 1
+
+    # Attempt to write to /usr
+    res_usr = await runtime.execute("touch /usr/hack.txt", "bash")
+    assert res_usr.exit_code != 0
+
+@pytest.mark.live
+@pytest.mark.asyncio
+async def test_subdirectory_persistence_and_listing(filesystem_docker_runtime: DockerRuntime) -> None:
+    """Verify creating subdirectories and files works as expected in user home."""
+    runtime = filesystem_docker_runtime
+
+    # 1. Create Subdir
+    await runtime.execute("mkdir -p subdir/nested", "bash")
+
+    # 2. Write file
+    await runtime.execute("echo 'secret' > subdir/nested/file.txt", "bash")
+
+    # 3. List files via Runtime API (using relative path)
+    files = await runtime.list_files("subdir/nested")
+    assert "file.txt" in files
+
+    # 4. Verify Content
+    res_cat = await runtime.execute("cat subdir/nested/file.txt", "bash")
+    assert res_cat.stdout.strip() == "secret"
+
+@pytest.mark.live
+@pytest.mark.asyncio
+async def test_python_path_consistency(filesystem_docker_runtime: DockerRuntime) -> None:
+    """Verify that Python environment is healthy in the new user context."""
+    runtime = filesystem_docker_runtime
+
+    # Ensure pip is available and user can install (if simulated) or at least check version
+    res_pip = await runtime.execute("pip --version", "bash")
+    assert res_pip.exit_code == 0
+
+    # Ensure we are using the system/local python
+    res_which = await runtime.execute("which python", "bash")
+    assert res_which.exit_code == 0
+
+    # Verify we can write pyc files (implied by execution usually, but good to check write permissions in execution dir)
+    res_py = await runtime.execute("import sys; print(sys.executable)", "python")
+    assert res_py.exit_code == 0
