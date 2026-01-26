@@ -1,18 +1,18 @@
 from unittest.mock import patch
-
 from coreason_sandbox.config import SandboxConfig
 
 
-def test_vault_settings_source_injects_secrets() -> None:
-    """Test that VaultSettingsSource hydrates config from env vars (simulated vault)."""
-    with patch.dict("os.environ", {"E2B_API_KEY": "secret_key"}):
+def test_config_env_var_override() -> None:
+    """Test that SandboxConfig reads from standard env vars."""
+    # Pydantic reads COREASON_SANDBOX_ prefixed vars
+    with patch.dict("os.environ", {"COREASON_SANDBOX_E2B_API_KEY": "secret_key"}):
         config = SandboxConfig()
         assert config.e2b_api_key == "secret_key"
 
 
-def test_vault_settings_source_ignores_missing() -> None:
-    """Test that missing secrets are ignored."""
-    # Ensure environment is clean of relevant keys
+def test_config_defaults() -> None:
+    """Test defaults when no env vars are present."""
     with patch.dict("os.environ", {}, clear=True):
         config = SandboxConfig()
         assert config.e2b_api_key is None
+        assert config.runtime == "docker"
