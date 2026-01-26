@@ -1,5 +1,6 @@
-from typing import AsyncGenerator
 import os
+from typing import AsyncGenerator
+
 import docker
 import pytest
 import pytest_asyncio
@@ -20,12 +21,7 @@ async def built_docker_image() -> AsyncGenerator[str, None]:
         # This assumes the test is run from the project root
         project_root = os.getcwd()
         print(f"Building Docker image from {project_root}...")
-        client.images.build(
-            path=project_root,
-            dockerfile="Dockerfile",
-            tag=image_tag,
-            rm=True
-        )
+        client.images.build(path=project_root, dockerfile="Dockerfile", tag=image_tag, rm=True)
         yield image_tag
     except (docker.errors.BuildError, docker.errors.APIError) as e:
         pytest.skip(f"Failed to build Docker image: {e}")
