@@ -15,8 +15,8 @@ from typing import Any, Literal
 from loguru import logger
 
 from coreason_sandbox.config import SandboxConfig
+from coreason_sandbox.integrations.veritas import VeritasIntegrator
 from coreason_sandbox.session_manager import Session, SessionManager
-from coreason_sandbox.utils.veritas import VeritasIntegrator
 
 
 class SandboxMCP:
@@ -28,7 +28,8 @@ class SandboxMCP:
 
     def __init__(self, config: SandboxConfig | None = None):
         self.config = config or SandboxConfig()
-        self.veritas = VeritasIntegrator()
+
+        self.veritas = VeritasIntegrator(enabled=self.config.enable_audit_logging)
         self.session_manager = SessionManager(self.config)
 
     @property

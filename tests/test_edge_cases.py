@@ -4,9 +4,9 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-import coreason_sandbox.utils.veritas
+import coreason_sandbox.integrations.veritas
 import pytest
-from coreason_sandbox.utils.artifacts import ArtifactManager
+from coreason_sandbox.artifacts import ArtifactManager
 
 # --- ArtifactManager Tests ---
 
@@ -80,14 +80,14 @@ def test_veritas_import_error_simulation() -> None:
 
         with patch("builtins.__import__", side_effect=mock_import):
             # Reload the module under test
-            importlib.reload(coreason_sandbox.utils.veritas)
+            importlib.reload(coreason_sandbox.integrations.veritas)
 
             # Assertions
             # Use getattr to avoid mypy error about IERLogger not being exported
-            assert getattr(coreason_sandbox.utils.veritas, "IERLogger", None) is None
-            integrator = coreason_sandbox.utils.veritas.VeritasIntegrator()
+            assert getattr(coreason_sandbox.integrations.veritas, "IERLogger", None) is None
+            integrator = coreason_sandbox.integrations.veritas.VeritasIntegrator()
             assert integrator.enabled is False
 
     # 2. Cleanup: Reload the module again to restore it to original state
     #    (assuming coreason_veritas is actually installed in the env)
-    importlib.reload(coreason_sandbox.utils.veritas)
+    importlib.reload(coreason_sandbox.integrations.veritas)

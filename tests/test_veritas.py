@@ -2,12 +2,12 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
-from coreason_sandbox.utils.veritas import VeritasIntegrator
+from coreason_sandbox.integrations.veritas import VeritasIntegrator
 
 
 @pytest.fixture
 def mock_ier_logger() -> Any:
-    with patch("coreason_sandbox.utils.veritas.IERLogger") as mock:
+    with patch("coreason_sandbox.integrations.veritas.IERLogger") as mock:
         yield mock
 
 
@@ -30,7 +30,7 @@ async def test_veritas_integration_success(mock_ier_logger: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_veritas_disabled() -> None:
-    with patch("coreason_sandbox.utils.veritas.IERLogger", None):
+    with patch("coreason_sandbox.integrations.veritas.IERLogger", None):
         integrator = VeritasIntegrator()
         assert integrator.enabled is False
 
@@ -40,7 +40,7 @@ async def test_veritas_disabled() -> None:
 
 @pytest.mark.asyncio
 async def test_veritas_init_exception() -> None:
-    with patch("coreason_sandbox.utils.veritas.IERLogger") as mock:
+    with patch("coreason_sandbox.integrations.veritas.IERLogger") as mock:
         mock.side_effect = Exception("Init failed")
         integrator = VeritasIntegrator()
         assert integrator.enabled is False

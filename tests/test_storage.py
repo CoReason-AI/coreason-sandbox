@@ -4,12 +4,12 @@ from unittest.mock import patch
 
 import pytest
 from botocore.exceptions import ClientError
-from coreason_sandbox.utils.storage import S3Storage
+from coreason_sandbox.storage import S3Storage
 
 
 @pytest.fixture
 def mock_boto3() -> Any:
-    with patch("coreason_sandbox.utils.storage.boto3") as mock:
+    with patch("coreason_sandbox.storage.boto3") as mock:
         yield mock
 
 

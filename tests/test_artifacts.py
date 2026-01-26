@@ -71,7 +71,7 @@ async def test_execute_captures_artifacts(docker_runtime: DockerRuntime) -> None
 
 @pytest.mark.asyncio
 async def test_artifact_manager_processing(tmp_path: Any) -> None:
-    from coreason_sandbox.utils.artifacts import ArtifactManager
+    from coreason_sandbox.artifacts import ArtifactManager
 
     manager = ArtifactManager()
 
@@ -94,7 +94,7 @@ async def test_artifact_manager_processing(tmp_path: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_artifact_manager_storage(tmp_path: Any) -> None:
-    from coreason_sandbox.utils.artifacts import ArtifactManager
+    from coreason_sandbox.artifacts import ArtifactManager
 
     mock_storage = MagicMock()
     mock_storage.upload_file.return_value = "http://s3/test.pdf"

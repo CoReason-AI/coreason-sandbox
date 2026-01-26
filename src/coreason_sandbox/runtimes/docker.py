@@ -16,9 +16,9 @@ from docker.models.containers import Container
 from loguru import logger
 from packaging.requirements import Requirement
 
+from coreason_sandbox.artifacts import ArtifactManager
 from coreason_sandbox.models import ExecutionResult, FileReference
 from coreason_sandbox.runtime import SandboxRuntime
-from coreason_sandbox.utils.artifacts import ArtifactManager
 
 
 class DockerRuntime(SandboxRuntime):
