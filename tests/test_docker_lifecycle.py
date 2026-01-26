@@ -33,6 +33,7 @@ async def test_start_success(docker_runtime: DockerRuntime, mock_docker_client: 
     assert call_args[0][0] == "python:3.12-slim"
     assert call_args[1]["network_mode"] == "none"
     assert call_args[1]["remove"] is True
+    assert call_args[1]["working_dir"] == "/home/user"
 
 
 @pytest.mark.asyncio

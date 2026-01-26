@@ -82,7 +82,7 @@ async def test_docker_io_live(live_docker_runtime: DockerRuntime, tmp_path: Path
     local_file.write_text(test_content)
 
     # 2. Upload
-    remote_path = "/home/sandbox/uploaded.txt"
+    remote_path = "/home/user/uploaded.txt"
     await runtime.upload(local_file, remote_path)
 
     # Verify existence with bash
@@ -92,13 +92,13 @@ async def test_docker_io_live(live_docker_runtime: DockerRuntime, tmp_path: Path
 
     # 3. Create file in container (via Python) and download
     code = """
-with open('/home/sandbox/generated.txt', 'w') as f:
+with open('/home/user/generated.txt', 'w') as f:
     f.write('Generated Content')
 """
     await runtime.execute(code, "python")
 
     download_path = tmp_path / "downloaded.txt"
-    await runtime.download("/home/sandbox/generated.txt", download_path)
+    await runtime.download("/home/user/generated.txt", download_path)
 
     assert download_path.exists()
     assert download_path.read_text() == "Generated Content"
@@ -126,10 +126,10 @@ async def test_docker_isolation_live(live_docker_runtime: DockerRuntime) -> None
         assert runtime1.container.id != runtime2.container.id
 
         # Write to Runtime 1
-        await runtime1.execute("touch /home/sandbox/unique_file", "bash")
+        await runtime1.execute("touch /home/user/unique_file", "bash")
 
         # Check Runtime 2 (should not have file)
-        result = await runtime2.execute("ls /home/sandbox/unique_file", "bash")
+        result = await runtime2.execute("ls /home/user/unique_file", "bash")
         assert result.exit_code != 0  # Should fail
 
     except (docker.errors.DockerException, docker.errors.APIError) as e:
