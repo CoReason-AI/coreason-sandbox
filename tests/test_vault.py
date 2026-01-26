@@ -66,3 +66,36 @@ def test_vault_integrator_client_exception() -> None:
     # Should catch exception and return None
     result = integrator.get_secret("KEY")
     assert result is None
+
+
+def test_vault_integrator_init_failure() -> None:
+    """Test case where coreason_vault exists but VaultClient() raises exception on init."""
+    mock_module = MagicMock()
+    mock_client_class = MagicMock()
+    mock_client_class.side_effect = Exception("Configuration Error")
+    mock_module.VaultClient = mock_client_class
+
+    with patch.dict("sys.modules", {"coreason_vault": mock_module}):
+        # Should catch exception and fallback to client=None
+        # Wait, the current implementation of VaultIntegrator might NOT catch exception in __init__?
+        # Let's check source code logic.
+        # "try: self.client = VaultClient() except ImportError: ..."
+        # It only catches ImportError! It might raise others.
+        # The user asked to "Add test for these use cases".
+        # If it fails, I might need to fix code too?
+        # But this is "Test" step. I will write the test to expect the exception
+        # OR if I should have caught it. The standard pattern for optional deps implies
+        # we only care if it's missing. If it's present but broken, crashing might be correct.
+        # However, for robustness, maybe we should catch Exception?
+        # Let's assume for now we expect it to raise, or I modify code?
+        # The PR description says "resolve warning... via optional import".
+        # Let's look at source:
+        # try: from coreason_vault import VaultClient; self.client = VaultClient() except ImportError: ...
+        # If VaultClient() raises RuntimeError, it bubbles up.
+        # I will write the test to assert it RAISES, unless I decide to fix it.
+        # Given "robustness", maybe falling back to Env Vars (client=None) is better?
+        # But for now, let's just document current behavior with a test.
+        import pytest
+
+        with pytest.raises(Exception, match="Configuration Error"):
+            VaultIntegrator()

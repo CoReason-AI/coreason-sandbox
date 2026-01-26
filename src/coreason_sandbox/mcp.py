@@ -10,7 +10,8 @@
 
 import asyncio
 import time
-from typing import Any, Literal
+from contextlib import asynccontextmanager
+from typing import Any, AsyncIterator, Literal
 
 from loguru import logger
 
@@ -45,12 +46,12 @@ class SandboxMCP:
         # For tests that inspect reaper task
         return self.session_manager._reaper_task
 
-    async def execute_code(
-        self, session_id: str, language: Literal["python", "bash", "r"], code: str
-    ) -> dict[str, str | int | float | list[dict[str, Any]]]:
+    @asynccontextmanager
+    async def _session_scope(self, session_id: str) -> AsyncIterator[Session]:
         """
-        Execute code in the sandbox for the given session.
-        Retries if session is terminated during acquisition.
+        Context manager to acquire a locked, active session.
+        Retries if session is terminated during acquisition (race condition).
+        Updates last_accessed time on exit.
         """
         if not session_id:
             raise ValueError("Session ID is required")
@@ -64,14 +65,25 @@ class SandboxMCP:
                     logger.warning(f"Session {session_id} inactive/reaped. Retrying creation.")
                     continue
 
-                # Veritas Audit Log
-                await self.veritas.log_pre_execution(code, language)
-
-                result = await session.runtime.execute(code, language)
-
-                # Update access time after execution
-                session.last_accessed = time.time()
+                try:
+                    yield session
+                finally:
+                    # Update access time after execution
+                    session.last_accessed = time.time()
                 break
+
+    async def execute_code(
+        self, session_id: str, language: Literal["python", "bash", "r"], code: str
+    ) -> dict[str, str | int | float | list[dict[str, Any]]]:
+        """
+        Execute code in the sandbox for the given session.
+        Retries if session is terminated during acquisition.
+        """
+        async with self._session_scope(session_id) as session:
+            # Veritas Audit Log
+            await self.veritas.log_pre_execution(code, language)
+
+            result = await session.runtime.execute(code, language)
 
         # Convert artifacts to simpler dicts for MCP response if needed
         artifacts_data = [
@@ -95,19 +107,8 @@ class SandboxMCP:
         """
         Install a package in the sandbox session.
         """
-        if not session_id:
-            raise ValueError("Session ID is required")
-
-        while True:
-            session = await self.session_manager.get_or_create_session(session_id)
-
-            async with session.lock:
-                if not session.active:
-                    continue
-
-                await session.runtime.install_package(package_name)
-                session.last_accessed = time.time()
-                break
+        async with self._session_scope(session_id) as session:
+            await session.runtime.install_package(package_name)
 
         return f"Package {package_name} installed successfully."
 
@@ -115,19 +116,8 @@ class SandboxMCP:
         """
         List files in the sandbox session directory.
         """
-        if not session_id:
-            raise ValueError("Session ID is required")
-
-        while True:
-            session = await self.session_manager.get_or_create_session(session_id)
-
-            async with session.lock:
-                if not session.active:
-                    continue
-
-                files = await session.runtime.list_files(path)
-                session.last_accessed = time.time()
-                break
+        async with self._session_scope(session_id) as session:
+            files = await session.runtime.list_files(path)
 
         return files
 
