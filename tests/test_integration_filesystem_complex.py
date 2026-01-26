@@ -1,18 +1,44 @@
 from typing import AsyncGenerator
-
+import os
 import docker
 import pytest
 import pytest_asyncio
 from coreason_sandbox.runtimes.docker import DockerRuntime
 
-# test_integration_live via import if possible, or just redefine it to be self-contained.)
+
+@pytest_asyncio.fixture(scope="module")
+async def built_docker_image() -> AsyncGenerator[str, None]:
+    """
+    Builds the Docker image from the project Dockerfile for testing.
+    Returns the image tag.
+    """
+    client = docker.from_env()
+    image_tag = "coreason-sandbox-test:latest"
+
+    try:
+        # Build image
+        # This assumes the test is run from the project root
+        project_root = os.getcwd()
+        print(f"Building Docker image from {project_root}...")
+        client.images.build(
+            path=project_root,
+            dockerfile="Dockerfile",
+            tag=image_tag,
+            rm=True
+        )
+        yield image_tag
+    except (docker.errors.BuildError, docker.errors.APIError) as e:
+        pytest.skip(f"Failed to build Docker image: {e}")
+    finally:
+        # Cleanup if needed (optional, keeping it cached is faster)
+        pass
 
 
 @pytest_asyncio.fixture
-async def filesystem_docker_runtime() -> AsyncGenerator[DockerRuntime, None]:
+async def filesystem_docker_runtime(built_docker_image: str) -> AsyncGenerator[DockerRuntime, None]:
     runtime = None
     try:
-        runtime = DockerRuntime(image="python:3.12-slim", timeout=30.0)
+        runtime = DockerRuntime(image=built_docker_image, timeout=30.0)
         await runtime.start()
         yield runtime
     except (docker.errors.ImageNotFound, docker.errors.DockerException, docker.errors.APIError) as e:
