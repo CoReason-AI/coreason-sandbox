@@ -31,9 +31,9 @@ async def test_execute_captures_artifacts(docker_runtime: DockerRuntime) -> None
     # Actually wait, `start` calls `mkdir`, but here we inject container mock.
 
     # Sequence of exec_run calls in execute():
-    # 1. ls -1 /home/sandbox (before)
+    # 1. ls -1 /home/user (before)
     # 2. cmd execution
-    # 3. ls -1 /home/sandbox (after)
+    # 3. ls -1 /home/user (after)
 
     # We must cast container to MagicMock to satisfy mypy
     container_mock = docker_runtime.container

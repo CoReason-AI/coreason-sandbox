@@ -43,7 +43,7 @@ class DockerRuntime(SandboxRuntime):
         self.timeout = timeout
         self.container: Container | None = None
         self.artifact_manager = artifact_manager or ArtifactManager()
-        self.work_dir = "/home/sandbox"
+        self.work_dir = "/home/user"
 
     async def start(self) -> None:
         """

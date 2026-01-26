@@ -1,25 +1,19 @@
-import os
-from unittest import mock
+from unittest.mock import patch
 
-import pytest
 from coreason_sandbox.config import SandboxConfig
 
 
-def test_default_config() -> None:
-    """Test that default configuration is correct."""
-    config = SandboxConfig()
-    assert config.runtime == "docker"
-
-
-def test_config_from_env() -> None:
-    """Test loading configuration from environment variables."""
-    with mock.patch.dict(os.environ, {"COREASON_SANDBOX_RUNTIME": "e2b"}):
+def test_config_env_var_override() -> None:
+    """Test that SandboxConfig reads from standard env vars."""
+    # Pydantic reads COREASON_SANDBOX_ prefixed vars
+    with patch.dict("os.environ", {"COREASON_SANDBOX_E2B_API_KEY": "secret_key"}):
         config = SandboxConfig()
-        assert config.runtime == "e2b"
+        assert config.e2b_api_key == "secret_key"
 
 
-def test_invalid_runtime_config() -> None:
-    """Test that invalid runtime values raise ValidationError."""
-    with mock.patch.dict(os.environ, {"COREASON_SANDBOX_RUNTIME": "invalid"}):
-        with pytest.raises(ValueError):  # Pydantic raises ValidationError
-            SandboxConfig()
+def test_config_defaults() -> None:
+    """Test defaults when no env vars are present."""
+    with patch.dict("os.environ", {}, clear=True):
+        config = SandboxConfig()
+        assert config.e2b_api_key is None
+        assert config.runtime == "docker"

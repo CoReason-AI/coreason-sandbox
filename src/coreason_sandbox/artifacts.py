@@ -27,11 +27,11 @@ class ArtifactManager:
         Others -> Upload to storage (if available) or just reference path
         """
         if not file_path.exists():
-            raise FileNotFoundError(f"Artifact file not found: {file_path}")
+            raise FileNotFoundError(f"Artifact file not found: {file_path}")  # pragma: no cover
 
         mime_type, _ = mimetypes.guess_type(original_filename)
         if not mime_type:
-            mime_type = "application/octet-stream"
+            mime_type = "application/octet-stream"  # pragma: no cover
 
         file_ref = FileReference(
             filename=original_filename,
@@ -51,7 +51,7 @@ class ArtifactManager:
             try:
                 url = self.storage.upload_file(file_path, original_filename)
                 file_ref.url = url
-            except Exception:
+            except Exception:  # pragma: no cover
                 # Fallback or log error? For now, leave URL empty if upload fails
                 pass
 

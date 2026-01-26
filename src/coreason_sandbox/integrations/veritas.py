@@ -2,49 +2,24 @@ import hashlib
 
 from loguru import logger
 
-# Try importing IERLogger
-try:
-    from coreason_veritas.auditor import IERLogger
-except ImportError:
-    IERLogger = None  # type: ignore
-    logger.warning("IERLogger not found in coreason_veritas. Audit logging disabled.")
-
 
 class VeritasIntegrator:
     """
-    Integrates with coreason-veritas for audit logging.
+    Standalone Integrator: Audit logging is disabled or logs to stdout.
+    Removes dependency on coreason-veritas.
     """
 
     def __init__(self, service_name: str = "coreason-sandbox", enabled: bool = True):
-        # Only enable if config says YES and library is present
-        self.enabled = enabled and (IERLogger is not None)
-        self.logger = None
-
+        self.enabled = enabled
         if self.enabled:
-            try:
-                self.logger = IERLogger(service_name=service_name)
-            except Exception as e:
-                logger.warning(f"Failed to initialize Veritas IERLogger: {e}")
-                self.enabled = False
+            logger.info("Veritas Audit Logging enabled (Local Mode - STDOUT only)")
 
     async def log_pre_execution(self, code: str, language: str) -> str:
         """
-        Log the code execution attempt. Returns a hash of the code.
+        Log the code execution attempt to local logs.
         """
-        # Generate hash
         code_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
-
-        if self.enabled and self.logger:
-            try:
-                await self.logger.log_event(
-                    event_type="SANDBOX_EXECUTION_START",
-                    details={
-                        "language": language,
-                        "code_hash": code_hash,
-                        "code_length": len(code),
-                    },
-                )
-            except Exception as e:
-                logger.error(f"Veritas logging failed: {e}")
-
+        if self.enabled:
+            # Log to standard logger instead of external auditor
+            logger.info(f"AUDIT: Executing {language} code. Hash: {code_hash}, Length: {len(code)}")
         return code_hash
