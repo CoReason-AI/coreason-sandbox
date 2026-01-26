@@ -28,22 +28,37 @@ class Session:
 
 
 class SessionManager:
-    """
-    Manages the lifecycle of sandbox sessions.
+    """Manages the lifecycle of sandbox sessions.
+
     Handles creation, caching, and automatic cleanup of idle sessions.
+    Uses a background reaper task to terminate expired sessions.
     """
 
     def __init__(self, config: SandboxConfig | None = None):
+        """Initializes the SessionManager.
+
+        Args:
+            config: Optional configuration object. If not provided, defaults are used.
+        """
         self.config = config or SandboxConfig()
         self.sessions: dict[str, Session] = {}
         self._reaper_task: asyncio.Task[None] | None = None
         self._creation_lock = asyncio.Lock()
 
     async def get_or_create_session(self, session_id: str) -> Session:
-        """
-        Retrieve existing session or create a new one.
-        Updates last_accessed timestamp.
-        Thread-safe against concurrent creation for same ID.
+        """Retrieve existing session or create a new one.
+
+        Updates the last_accessed timestamp for the session.
+        This method is thread-safe against concurrent creation for the same session ID.
+
+        Args:
+            session_id: The unique identifier for the session.
+
+        Returns:
+            Session: The active session object.
+
+        Raises:
+            ValueError: If session_id is empty.
         """
         if not session_id:
             raise ValueError("Session ID is required")
@@ -109,8 +124,10 @@ class SessionManager:
             logger.error(f"Session reaper crashed: {e}")
 
     async def shutdown(self) -> None:
-        """
-        Terminate all sessions and stop the reaper.
+        """Terminate all sessions and stop the reaper.
+
+        Stops the background reaper task and forcefully terminates all active
+        sandbox sessions.
         """
         if self._reaper_task and not self._reaper_task.done():
             self._reaper_task.cancel()

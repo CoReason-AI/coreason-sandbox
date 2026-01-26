@@ -13,18 +13,31 @@ class ObjectStorage(Protocol):
 
 
 class ArtifactManager:
-    """
-    Manages processing of artifacts generated in the sandbox.
-    """
+    """Manages processing of artifacts generated in the sandbox."""
 
     def __init__(self, storage: ObjectStorage | None = None):
+        """Initializes the ArtifactManager.
+
+        Args:
+            storage: Optional ObjectStorage backend for uploading non-image artifacts.
+        """
         self.storage = storage
 
     def process_file(self, file_path: Path, original_filename: str) -> FileReference:
-        """
-        Process a local file (downloaded from sandbox) and return a FileReference.
-        Images -> Base64
-        Others -> Upload to storage (if available) or just reference path
+        """Process a local file (downloaded from sandbox) and return a FileReference.
+
+        Converts images to Base64 data URIs.
+        Uploads other file types to object storage if configured, returning a signed URL.
+
+        Args:
+            file_path: The local path to the artifact file.
+            original_filename: The original filename in the sandbox.
+
+        Returns:
+            FileReference: A reference object containing metadata and access URL.
+
+        Raises:
+            FileNotFoundError: If the local file path does not exist.
         """
         if not file_path.exists():
             raise FileNotFoundError(f"Artifact file not found: {file_path}")  # pragma: no cover
