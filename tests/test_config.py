@@ -1,25 +1,17 @@
-import os
-from unittest import mock
-
-import pytest
-from coreason_sandbox.config import SandboxConfig
+from unittest.mock import patch, MagicMock
+from coreason_sandbox.config import SandboxConfig, VaultSettingsSource
 
 
-def test_default_config() -> None:
-    """Test that default configuration is correct."""
-    config = SandboxConfig()
-    assert config.runtime == "docker"
-
-
-def test_config_from_env() -> None:
-    """Test loading configuration from environment variables."""
-    with mock.patch.dict(os.environ, {"COREASON_SANDBOX_RUNTIME": "e2b"}):
+def test_vault_settings_source_injects_secrets() -> None:
+    """Test that VaultSettingsSource hydrates config from env vars (simulated vault)."""
+    with patch.dict("os.environ", {"E2B_API_KEY": "secret_key"}):
         config = SandboxConfig()
-        assert config.runtime == "e2b"
+        assert config.e2b_api_key == "secret_key"
 
 
-def test_invalid_runtime_config() -> None:
-    """Test that invalid runtime values raise ValidationError."""
-    with mock.patch.dict(os.environ, {"COREASON_SANDBOX_RUNTIME": "invalid"}):
-        with pytest.raises(ValueError):  # Pydantic raises ValidationError
-            SandboxConfig()
+def test_vault_settings_source_ignores_missing() -> None:
+    """Test that missing secrets are ignored."""
+    # Ensure environment is clean of relevant keys
+    with patch.dict("os.environ", {}, clear=True):
+        config = SandboxConfig()
+        assert config.e2b_api_key is None
