@@ -86,7 +86,14 @@ class DockerRuntime(SandboxRuntime):
             raise
 
     async def _list_files_internal(self, path: str) -> set[str]:
-        """Helper to list files for artifact detection."""
+        """Helper to list files for artifact detection.
+
+        Args:
+            path: The directory path to list.
+
+        Returns:
+            set[str]: A set of filenames.
+        """
         try:
             files = await self.list_files(path)
             return set(files)
@@ -124,9 +131,18 @@ class DockerRuntime(SandboxRuntime):
         return [f.strip() for f in files if f.strip()]
 
     def _download_and_package(self, package_name: str) -> bytes:
-        """
-        Download package wheels and package them into a tar stream.
+        """Download package wheels and package them into a tar stream.
+
         Runs synchronously (CPU/IO bound).
+
+        Args:
+            package_name: The name of the package to download.
+
+        Returns:
+            bytes: The content of the tar archive as bytes.
+
+        Raises:
+            RuntimeError: If the download fails.
         """
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir_str:
             temp_dir = Path(temp_dir_str)
