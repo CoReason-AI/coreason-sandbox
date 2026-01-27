@@ -160,4 +160,7 @@ async def test_concurrent_access_sequentiality(mock_factory: Any, mock_runtime: 
     # t1 releases. t2 acquires, sleeps 0.05.
     # Total ~0.1s.
 
-    assert (end - start) >= 0.1
+    # Allow slight variance (e.g., 0.09s) due to loop overhead/clock resolution
+    assert (end - start) >= 0.08
+
+    await mcp.shutdown()

@@ -8,6 +8,12 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_sandbox
 
+"""Configuration for the application logger.
+
+Sets up loguru logger with sinks for stdout (human-readable) and file (JSON,
+rotated).
+"""
+
 import sys
 from pathlib import Path
 
