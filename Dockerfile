@@ -21,14 +21,14 @@ RUN python -m build --wheel --outdir /wheels
 FROM python:3.12-slim AS runtime
 
 # Create a non-root user
-RUN useradd --create-home --shell /bin/bash appuser
-USER appuser
+RUN useradd --create-home --shell /bin/bash user
+USER user
 
 # Add user's local bin to PATH
-ENV PATH="/home/appuser/.local/bin:${PATH}"
+ENV PATH="/home/user/.local/bin:${PATH}"
 
 # Set the working directory
-WORKDIR /home/appuser/app
+WORKDIR /home/user/app
 
 # Copy the wheel from the builder stage
 COPY --from=builder /wheels /wheels

@@ -8,14 +8,8 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_sandbox
 
-"""
-coreason-sandbox
-"""
+from coreason_sandbox.config import SandboxConfig
+from coreason_sandbox.sandbox import Sandbox, SandboxAsync
+from coreason_sandbox.session_manager import SessionManager
 
-__version__ = "0.1.0"
-__author__ = "Gowtham A Rao"
-__email__ = "gowtham.rao@coreason.ai"
-
-from .main import hello_world
-
-__all__ = ["hello_world"]
+__all__ = ["Sandbox", "SandboxAsync", "SessionManager", "SandboxConfig"]
