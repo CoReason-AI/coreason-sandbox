@@ -7,14 +7,23 @@ from coreason_sandbox.storage import S3Storage
 
 
 class SandboxFactory:
-    """
-    Factory to create SandboxRuntime instances based on configuration.
-    """
+    """Factory to create SandboxRuntime instances based on configuration."""
 
     @staticmethod
     def get_runtime(config: SandboxConfig) -> SandboxRuntime:
-        """
-        Returns an instance of the configured SandboxRuntime.
+        """Returns an instance of the configured SandboxRuntime.
+
+        Creates a DockerRuntime or E2BRuntime based on the provided configuration.
+        Also initializes the ArtifactManager and S3Storage if configured.
+
+        Args:
+            config: The configuration object.
+
+        Returns:
+            SandboxRuntime: An instance of the configured runtime.
+
+        Raises:
+            ValueError: If an unknown runtime is specified in the configuration.
         """
         # Initialize storage backend if configured
         storage = None

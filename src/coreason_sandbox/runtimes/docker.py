@@ -22,8 +22,9 @@ from coreason_sandbox.runtime import SandboxRuntime
 
 
 class DockerRuntime(SandboxRuntime):
-    """
-    Docker-based implementation of the SandboxRuntime.
+    """Docker-based implementation of the SandboxRuntime.
+
+    Uses local Docker containers to provide isolated execution environments.
     """
 
     def __init__(
@@ -35,6 +36,16 @@ class DockerRuntime(SandboxRuntime):
         timeout: float = 60.0,
         artifact_manager: ArtifactManager | None = None,
     ):
+        """Initializes the DockerRuntime.
+
+        Args:
+            image: The Docker image to use.
+            cpu_limit: CPU limit in vCPUs.
+            mem_limit: Memory limit (e.g., "512m").
+            allowed_packages: Set of allowed Python packages.
+            timeout: Execution timeout in seconds.
+            artifact_manager: Manager for processing artifacts.
+        """
         self.client = docker.from_env()
         self.image = image
         self.cpu_limit = cpu_limit
@@ -46,8 +57,13 @@ class DockerRuntime(SandboxRuntime):
         self.work_dir = "/home/user"
 
     async def start(self) -> None:
-        """
-        Boot the environment.
+        """Boot the environment.
+
+        Starts a detached Docker container with specified resource limits and networking disabled.
+        Ensures the working directory exists.
+
+        Raises:
+            DockerException: If the container fails to start.
         """
         logger.info(f"Starting Docker sandbox with image {self.image}")
         try:
@@ -78,8 +94,16 @@ class DockerRuntime(SandboxRuntime):
             return set()
 
     async def list_files(self, path: str) -> list[str]:
-        """
-        List files in the directory.
+        """List files in the directory.
+
+        Args:
+            path: The directory path to list.
+
+        Returns:
+            list[str]: A list of filenames.
+
+        Raises:
+            RuntimeError: If the sandbox is not started.
         """
         if not self.container:
             raise RuntimeError("Sandbox not started")
@@ -104,7 +128,7 @@ class DockerRuntime(SandboxRuntime):
         Download package wheels and package them into a tar stream.
         Runs synchronously (CPU/IO bound).
         """
-        with tempfile.TemporaryDirectory() as temp_dir_str:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir_str:
             temp_dir = Path(temp_dir_str)
             cmd = [
                 sys.executable,
@@ -146,6 +170,7 @@ class DockerRuntime(SandboxRuntime):
                     check=True,
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
                 )
             except subprocess.CalledProcessError as e:
                 logger.error(f"Failed to download package {package_name} on host: {e.stderr}")
@@ -159,8 +184,17 @@ class DockerRuntime(SandboxRuntime):
             return tar_stream.getvalue()
 
     async def install_package(self, package_name: str) -> None:
-        """
-        Install a package dependency (pip only).
+        """Install a package dependency (pip only).
+
+        Downloads the package and its dependencies on the host (handling cross-platform wheels),
+        transfers them to the container, and installs them offline.
+
+        Args:
+            package_name: The name of the package to install.
+
+        Raises:
+            RuntimeError: If the sandbox is not started or installation fails.
+            ValueError: If the package is not allowed.
         """
         if not self.container:
             raise RuntimeError("Sandbox not started")
@@ -207,8 +241,23 @@ class DockerRuntime(SandboxRuntime):
             raise RuntimeError(f"Failed to install package: {msg}")
 
     async def execute(self, code: str, language: Literal["python", "bash", "r"]) -> ExecutionResult:
-        """
-        Run script and capture output.
+        """Run script and capture output.
+
+        Executes the code in the container, enforcing timeouts and capturing stdout/stderr.
+        Detects and retrieves new files created during execution as artifacts.
+
+        Args:
+            code: The source code to execute.
+            language: The programming language.
+
+        Returns:
+            ExecutionResult: The execution result including output and artifacts.
+
+        Raises:
+            RuntimeError: If the sandbox is not started.
+            ValueError: If the language is not supported.
+            TimeoutError: If execution exceeds the timeout.
+            DockerException: If docker execution fails.
         """
         if not self.container:
             raise RuntimeError("Sandbox not started")
@@ -256,7 +305,7 @@ class DockerRuntime(SandboxRuntime):
 
             artifacts: list[FileReference] = []
 
-            with tempfile.TemporaryDirectory() as tmp_dir_str:
+            with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir_str:
                 tmp_dir = Path(tmp_dir_str)
                 for filename in new_files:
                     remote_path = f"{self.work_dir}/{filename}"
@@ -283,8 +332,16 @@ class DockerRuntime(SandboxRuntime):
             raise
 
     async def upload(self, local_path: Path, remote_path: str) -> None:
-        """
-        Inject file into the sandbox.
+        """Inject file into the sandbox.
+
+        Args:
+            local_path: Path to the local file.
+            remote_path: Destination path in the container.
+
+        Raises:
+            RuntimeError: If the sandbox is not started.
+            FileNotFoundError: If the local file does not exist.
+            DockerException: If upload fails.
         """
         if not self.container:
             raise RuntimeError("Sandbox not started")
@@ -307,8 +364,16 @@ class DockerRuntime(SandboxRuntime):
             raise
 
     async def download(self, remote_path: str, local_path: Path) -> None:
-        """
-        Retrieve file from the sandbox.
+        """Retrieve file from the sandbox.
+
+        Args:
+            remote_path: Path to the file in the container.
+            local_path: Destination path on the host.
+
+        Raises:
+            RuntimeError: If the sandbox is not started.
+            DockerException: If download fails.
+            FileNotFoundError: If the remote file does not exist.
         """
         if not self.container:
             raise RuntimeError("Sandbox not started")
@@ -343,8 +408,9 @@ class DockerRuntime(SandboxRuntime):
             raise
 
     async def terminate(self) -> None:
-        """
-        Kill and cleanup the sandbox environment.
+        """Kill and cleanup the sandbox environment.
+
+        Forces the container to stop and removes it.
         """
         if self.container:
             logger.info(f"Terminating Docker sandbox: {self.container.short_id}")

@@ -16,9 +16,7 @@ from loguru import logger
 
 
 class S3Storage:
-    """
-    S3 implementation of the ObjectStorage protocol.
-    """
+    """S3 implementation of the ObjectStorage protocol."""
 
     def __init__(
         self,
@@ -28,6 +26,15 @@ class S3Storage:
         secret_key: str | None = None,
         endpoint_url: str | None = None,
     ):
+        """Initializes the S3Storage backend.
+
+        Args:
+            bucket: The S3 bucket name.
+            region: Optional AWS region name.
+            access_key: Optional AWS access key ID.
+            secret_key: Optional AWS secret access key.
+            endpoint_url: Optional endpoint URL for S3-compatible services (e.g., MinIO).
+        """
         self.bucket = bucket
         self.client = boto3.client(
             "s3",
@@ -38,8 +45,18 @@ class S3Storage:
         )
 
     def upload_file(self, file_path: Path, object_name: str) -> str:
-        """
-        Uploads a file to S3 and returns a presigned URL.
+        """Uploads a file to S3 and returns a presigned URL.
+
+        Args:
+            file_path: The local path to the file.
+            object_name: The destination object key in S3.
+
+        Returns:
+            str: A presigned URL to access the uploaded file.
+
+        Raises:
+            FileNotFoundError: If the local file does not exist.
+            ClientError: If the upload to S3 fails.
         """
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
