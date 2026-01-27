@@ -2,6 +2,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from coreason_sandbox.models import ExecutionResult
 from coreason_sandbox.sandbox import SandboxAsync
 
 
@@ -10,7 +11,9 @@ def mock_runtime() -> Any:
     mock = MagicMock()
     mock.start = AsyncMock()
     mock.terminate = AsyncMock()
-    mock.execute = AsyncMock(return_value="execution_result")
+    mock.execute = AsyncMock(
+        return_value=ExecutionResult(stdout="out", stderr="", exit_code=0, execution_duration=0.1, artifacts=[])
+    )
     mock.upload = AsyncMock()
     mock.download = AsyncMock()
     mock.install_package = AsyncMock()
@@ -33,7 +36,8 @@ async def test_sandbox_async_execute(mock_runtime: Any) -> None:
     with patch("coreason_sandbox.sandbox.SandboxFactory.get_runtime", return_value=mock_runtime):
         async with SandboxAsync() as svc:
             result = await svc.execute("print('hello')")
-            assert result == "execution_result"
+            assert isinstance(result, ExecutionResult)
+            assert result.stdout == "out"
             mock_runtime.execute.assert_awaited_once_with("print('hello')", "python")
 
 

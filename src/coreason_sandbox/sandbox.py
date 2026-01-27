@@ -9,7 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_sandbox
 
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 import anyio
 import httpx
@@ -53,9 +53,7 @@ class SandboxAsync:
         if self._internal_client:
             await self._client.aclose()
 
-    async def execute(
-        self, code: str, language: Literal["python", "bash", "r"] = "python"
-    ) -> ExecutionResult:
+    async def execute(self, code: str, language: Literal["python", "bash", "r"] = "python") -> ExecutionResult:
         """Executes code in the sandbox.
 
         Args:
@@ -138,9 +136,7 @@ class Sandbox:
         """Context exit point."""
         anyio.run(self._async.__aexit__, exc_type, exc_val, exc_tb)
 
-    def execute(
-        self, code: str, language: Literal["python", "bash", "r"] = "python"
-    ) -> ExecutionResult:
+    def execute(self, code: str, language: Literal["python", "bash", "r"] = "python") -> ExecutionResult:
         """Executes code in the sandbox synchronously.
 
         Args:

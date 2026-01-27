@@ -369,6 +369,7 @@ class DockerRuntime(SandboxRuntime):
         logger.info(f"Uploading {local_path} to {remote_path} in sandbox")
 
         def _do_upload() -> None:
+            assert self.container is not None
             tar_stream = io.BytesIO()
             with tarfile.open(fileobj=tar_stream, mode="w") as tar:
                 tar.add(local_path, arcname=os.path.basename(remote_path))
@@ -401,10 +402,11 @@ class DockerRuntime(SandboxRuntime):
         logger.info(f"Downloading {remote_path} to {local_path} from sandbox")
 
         def _do_download() -> None:
+            assert self.container is not None
             try:
                 bits, stat = self.container.get_archive(remote_path)
             except docker.errors.NotFound:
-                raise FileNotFoundError(f"Remote file not found: {remote_path}")
+                raise FileNotFoundError(f"Remote file not found: {remote_path}") from None
 
             tar_stream = io.BytesIO()
             for chunk in bits:
@@ -436,9 +438,9 @@ class DockerRuntime(SandboxRuntime):
             logger.error(f"Remote file not found: {remote_path}")
             raise
         except Exception as e:
-             # Catch generic errors from within thread
-             logger.error(f"Download failed with error: {e}")
-             raise e
+            # Catch generic errors from within thread
+            logger.error(f"Download failed with error: {e}")
+            raise
 
     async def terminate(self) -> None:
         """Kill and cleanup the sandbox environment.

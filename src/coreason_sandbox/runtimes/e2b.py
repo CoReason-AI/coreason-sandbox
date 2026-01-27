@@ -289,6 +289,7 @@ class E2BRuntime(SandboxRuntime):
             raise FileNotFoundError(f"Local file not found: {local_path}")
 
         def _do_upload() -> None:
+            assert self.sandbox is not None
             with open(local_path, "rb") as f:
                 self.sandbox.files.write(remote_path, f)
 
@@ -314,6 +315,7 @@ class E2BRuntime(SandboxRuntime):
             raise RuntimeError("Sandbox not started")
 
         def _do_download() -> None:
+            assert self.sandbox is not None
             content_bytes = self.sandbox.files.read(remote_path)
             if content_bytes is None:
                 raise FileNotFoundError(f"Remote file not found: {remote_path}")
@@ -324,9 +326,9 @@ class E2BRuntime(SandboxRuntime):
         try:
             await anyio.to_thread.run_sync(_do_download)
         except FileNotFoundError:
-             # Propagate specific exceptions
-             logger.error(f"Remote file not found: {remote_path}")
-             raise
+            # Propagate specific exceptions
+            logger.error(f"Remote file not found: {remote_path}")
+            raise
         except Exception as e:
             logger.error(f"E2B download failed: {e}")
             raise
