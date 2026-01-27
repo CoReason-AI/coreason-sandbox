@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Literal, TypeVar
 
+import anyio
 from e2b_code_interpreter import Sandbox as E2BSandbox
 from loguru import logger
 
@@ -252,7 +253,7 @@ class E2BRuntime(SandboxRuntime):
                         local_path = tmp_dir / filename
                         try:
                             await self.download(remote_path, local_path)
-                            ref = self.artifact_manager.process_file(local_path, filename)
+                            ref = await self.artifact_manager.process_file(local_path, filename)
                             artifacts.append(ref)
                         except Exception as e:
                             logger.warning(f"Failed to retrieve artifact {filename}: {e}")
@@ -287,9 +288,13 @@ class E2BRuntime(SandboxRuntime):
         if not local_path.exists():
             raise FileNotFoundError(f"Local file not found: {local_path}")
 
-        try:
+        def _do_upload() -> None:
+            assert self.sandbox is not None
             with open(local_path, "rb") as f:
-                await asyncio.to_thread(self.sandbox.files.write, remote_path, f)
+                self.sandbox.files.write(remote_path, f)
+
+        try:
+            await anyio.to_thread.run_sync(_do_upload)
         except Exception as e:
             logger.error(f"E2B upload failed: {e}")
             raise
@@ -309,14 +314,21 @@ class E2BRuntime(SandboxRuntime):
         if not self.sandbox:
             raise RuntimeError("Sandbox not started")
 
-        try:
-            content_bytes = await asyncio.to_thread(self.sandbox.files.read, remote_path)
-
+        def _do_download() -> None:
+            assert self.sandbox is not None
+            content_bytes = self.sandbox.files.read(remote_path)
             if content_bytes is None:
                 raise FileNotFoundError(f"Remote file not found: {remote_path}")
 
             with open(local_path, "wb") as f:
                 f.write(content_bytes)
+
+        try:
+            await anyio.to_thread.run_sync(_do_download)
+        except FileNotFoundError:
+            # Propagate specific exceptions
+            logger.error(f"Remote file not found: {remote_path}")
+            raise
         except Exception as e:
             logger.error(f"E2B download failed: {e}")
             raise

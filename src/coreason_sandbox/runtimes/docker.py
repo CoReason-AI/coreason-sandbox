@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 from typing import Literal
 
+import anyio
 import docker
 from docker.errors import DockerException
 from docker.models.containers import Container
@@ -328,7 +329,7 @@ class DockerRuntime(SandboxRuntime):
                     local_path = tmp_dir / filename
                     try:
                         await self.download(remote_path, local_path)
-                        ref = self.artifact_manager.process_file(local_path, filename)
+                        ref = await self.artifact_manager.process_file(local_path, filename)
                         artifacts.append(ref)
                     except Exception as e:
                         logger.warning(f"Failed to retrieve artifact {filename}: {e}")
@@ -367,14 +368,18 @@ class DockerRuntime(SandboxRuntime):
 
         logger.info(f"Uploading {local_path} to {remote_path} in sandbox")
 
-        tar_stream = io.BytesIO()
-        with tarfile.open(fileobj=tar_stream, mode="w") as tar:
-            tar.add(local_path, arcname=os.path.basename(remote_path))
-        tar_stream.seek(0)
+        def _do_upload() -> None:
+            assert self.container is not None
+            tar_stream = io.BytesIO()
+            with tarfile.open(fileobj=tar_stream, mode="w") as tar:
+                tar.add(local_path, arcname=os.path.basename(remote_path))
+            tar_stream.seek(0)
 
-        parent_dir = os.path.dirname(remote_path) or "/"
-        try:
+            parent_dir = os.path.dirname(remote_path) or "/"
             self.container.put_archive(path=parent_dir, data=tar_stream)
+
+        try:
+            await anyio.to_thread.run_sync(_do_upload)
         except DockerException as e:
             logger.error(f"Upload failed: {e}")
             raise
@@ -396,8 +401,12 @@ class DockerRuntime(SandboxRuntime):
 
         logger.info(f"Downloading {remote_path} to {local_path} from sandbox")
 
-        try:
-            bits, stat = self.container.get_archive(remote_path)
+        def _do_download() -> None:
+            assert self.container is not None
+            try:
+                bits, stat = self.container.get_archive(remote_path)
+            except docker.errors.NotFound:
+                raise FileNotFoundError(f"Remote file not found: {remote_path}") from None
 
             tar_stream = io.BytesIO()
             for chunk in bits:
@@ -416,11 +425,21 @@ class DockerRuntime(SandboxRuntime):
                 with open(local_path, "wb") as local_f:
                     local_f.write(f.read())
 
+        try:
+            await anyio.to_thread.run_sync(_do_download)
         except DockerException as e:
+            # Need to re-raise FileNotFoundError if it was raised inside
+            # But run_sync propagates exceptions, so check if e is DockerException only?
+            # FileNotFoundError is not DockerException.
             logger.error(f"Download failed: {e}")
             raise
         except FileNotFoundError:
+            # Propagate FileNotFoundError
             logger.error(f"Remote file not found: {remote_path}")
+            raise
+        except Exception as e:
+            # Catch generic errors from within thread
+            logger.error(f"Download failed with error: {e}")
             raise
 
     async def terminate(self) -> None:
