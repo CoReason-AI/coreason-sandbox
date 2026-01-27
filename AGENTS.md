@@ -131,7 +131,7 @@ Adhere to 12-Factor App principles. Use these standard variable names:
 ### **Docker Strategy**
 
 * **Multi-stage Build:** The Dockerfile has a builder stage and a runtime stage.
-* **User:** The app runs as a non-root user (appuser). **DO NOT** change this to root.
+* **User:** The app runs as a non-root user (user). **DO NOT** change this to root.
 * **Base Image:** Uses python:3.12-slim.
 
 ### **Dependencies**
