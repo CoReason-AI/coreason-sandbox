@@ -120,7 +120,14 @@ class E2BRuntime(SandboxRuntime):
             return []
 
     async def _list_files_internal(self, path: str) -> set[str]:
-        """Helper to list files for artifact detection."""
+        """Helper to list files for artifact detection.
+
+        Args:
+            path: The directory path to list.
+
+        Returns:
+            set[str]: A set of filenames.
+        """
         try:
             files = await self.list_files(path)
             return set(files)
@@ -128,9 +135,20 @@ class E2BRuntime(SandboxRuntime):
             return set()
 
     async def _run_sdk_command(self, func: Callable[..., T], *args: Any) -> T:
-        """
-        Helper to run an SDK command in a thread with timeout enforcement.
-        Restart sandbox on timeout.
+        """Helper to run an SDK command in a thread with timeout enforcement.
+
+        Restarts sandbox on timeout to ensure cleanup.
+
+        Args:
+            func: The SDK function to call.
+            *args: Arguments for the function.
+
+        Returns:
+            T: The result of the function call.
+
+        Raises:
+            TimeoutError: If execution exceeds the timeout.
+            Exception: If the SDK command fails.
         """
         try:
             return await asyncio.wait_for(

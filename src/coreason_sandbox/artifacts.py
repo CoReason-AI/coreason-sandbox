@@ -7,8 +7,18 @@ from coreason_sandbox.models import FileReference
 
 
 class ObjectStorage(Protocol):
+    """Protocol for object storage backends (e.g., S3)."""
+
     def upload_file(self, file_path: Path, object_name: str) -> str:
-        """Upload file and return URL."""
+        """Uploads a file to object storage and returns an access URL.
+
+        Args:
+            file_path: The local path to the file.
+            object_name: The destination object key.
+
+        Returns:
+            str: The URL to access the uploaded file.
+        """
         ...
 
 

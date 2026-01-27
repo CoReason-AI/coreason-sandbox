@@ -89,12 +89,19 @@ class SessionManager:
             return session
 
     async def _start_reaper_if_needed(self) -> None:
-        """Start the background reaper task if it's not running."""
+        """Start the background reaper task if it is not already running.
+
+        Ensures that the reaper task is active to clean up expired sessions.
+        """
         if self._reaper_task is None or self._reaper_task.done():
             self._reaper_task = asyncio.create_task(self._reaper_loop())
 
     async def _reaper_loop(self) -> None:
-        """Background task to cleanup expired sessions."""
+        """Background task to cleanup expired sessions.
+
+        Periodically checks for and terminates sessions that have exceeded the
+        idle timeout.
+        """
         logger.info("Session reaper started")
         try:
             while True:
