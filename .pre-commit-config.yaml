@@ -29,6 +29,10 @@ repos:
           - coreason-veritas
           - types-requests
           - types-setuptools
+          - types-aiofiles
+          - aiofiles
+          - anyio
+          - types-boto3
   - repo: https://github.com/AleksaC/hadolint-py
     rev: v2.14.0
     hooks:
