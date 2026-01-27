@@ -16,8 +16,9 @@ T = TypeVar("T")
 
 
 class E2BRuntime(SandboxRuntime):
-    """
-    E2B Cloud implementation of the SandboxRuntime.
+    """E2B Cloud implementation of the SandboxRuntime.
+
+    Uses E2B cloud-based microVMs for secure and scalable code execution.
     """
 
     def __init__(
@@ -27,6 +28,14 @@ class E2BRuntime(SandboxRuntime):
         timeout: float = 60.0,
         artifact_manager: ArtifactManager | None = None,
     ):
+        """Initializes the E2BRuntime.
+
+        Args:
+            api_key: E2B API Key. Defaults to E2B_API_KEY env var.
+            template: E2B template ID to use (default: 'base').
+            timeout: Execution timeout in seconds.
+            artifact_manager: Manager for processing artifacts.
+        """
         self.api_key = api_key or os.getenv("E2B_API_KEY")
         self.template = template
         self.timeout = timeout
@@ -34,8 +43,13 @@ class E2BRuntime(SandboxRuntime):
         self.artifact_manager = artifact_manager or ArtifactManager()
 
     async def start(self) -> None:
-        """
-        Boot the environment.
+        """Boot the environment.
+
+        Initializes and starts the E2B sandbox session.
+        If a session is already active, it is terminated first.
+
+        Raises:
+            Exception: If the sandbox fails to start.
         """
         if self.sandbox:
             logger.warning("E2B sandbox already running. Terminating old session before restart.")
@@ -56,8 +70,16 @@ class E2BRuntime(SandboxRuntime):
             raise
 
     async def install_package(self, package_name: str) -> None:
-        """
-        Install a package dependency.
+        """Install a package dependency.
+
+        Uses pip to install the package inside the E2B sandbox.
+
+        Args:
+            package_name: The name of the package to install.
+
+        Raises:
+            RuntimeError: If the sandbox is not started.
+            Exception: If installation fails.
         """
         if not self.sandbox:
             raise RuntimeError("Sandbox not started")
@@ -74,8 +96,16 @@ class E2BRuntime(SandboxRuntime):
             raise
 
     async def list_files(self, path: str) -> list[str]:
-        """
-        List files in the directory.
+        """List files in the directory.
+
+        Args:
+            path: The directory path to list.
+
+        Returns:
+            list[str]: A list of filenames.
+
+        Raises:
+            RuntimeError: If the sandbox is not started.
         """
         if not self.sandbox:
             raise RuntimeError("Sandbox not started")
@@ -114,8 +144,23 @@ class E2BRuntime(SandboxRuntime):
             raise TimeoutError(f"Execution exceeded {self.timeout} seconds limit.") from e
 
     async def execute(self, code: str, language: Literal["python", "bash", "r"]) -> ExecutionResult:
-        """
-        Run script and capture output.
+        """Run script and capture output.
+
+        Executes the code in the E2B sandbox and captures native artifacts (PNGs)
+        as well as filesystem artifacts.
+
+        Args:
+            code: The source code to execute.
+            language: The programming language.
+
+        Returns:
+            ExecutionResult: The execution result including output and artifacts.
+
+        Raises:
+            RuntimeError: If the sandbox is not started.
+            ValueError: If the language is not supported.
+            TimeoutError: If execution exceeds the timeout.
+            Exception: If execution fails.
         """
         if not self.sandbox:
             raise RuntimeError("Sandbox not started")
@@ -182,7 +227,7 @@ class E2BRuntime(SandboxRuntime):
             new_files = files_after - files_before
 
             if new_files:
-                with tempfile.TemporaryDirectory() as tmp_dir_str:
+                with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir_str:
                     tmp_dir = Path(tmp_dir_str)
                     for filename in new_files:
                         remote_path = filename
@@ -207,8 +252,16 @@ class E2BRuntime(SandboxRuntime):
             raise
 
     async def upload(self, local_path: Path, remote_path: str) -> None:
-        """
-        Inject file into the sandbox.
+        """Inject file into the sandbox.
+
+        Args:
+            local_path: Path to the local file.
+            remote_path: Destination path in the sandbox.
+
+        Raises:
+            RuntimeError: If the sandbox is not started.
+            FileNotFoundError: If the local file does not exist.
+            Exception: If upload fails.
         """
         if not self.sandbox:
             raise RuntimeError("Sandbox not started")
@@ -224,8 +277,16 @@ class E2BRuntime(SandboxRuntime):
             raise
 
     async def download(self, remote_path: str, local_path: Path) -> None:
-        """
-        Retrieve file from the sandbox.
+        """Retrieve file from the sandbox.
+
+        Args:
+            remote_path: Path to the file in the sandbox.
+            local_path: Destination path on the host.
+
+        Raises:
+            RuntimeError: If the sandbox is not started.
+            FileNotFoundError: If the remote file does not exist.
+            Exception: If download fails.
         """
         if not self.sandbox:
             raise RuntimeError("Sandbox not started")
@@ -243,8 +304,9 @@ class E2BRuntime(SandboxRuntime):
             raise
 
     async def terminate(self) -> None:
-        """
-        Kill and cleanup the sandbox environment.
+        """Kill and cleanup the sandbox environment.
+
+        Closes the E2B sandbox session.
         """
         if self.sandbox:
             logger.info(f"Terminating E2B sandbox: {self.sandbox.sandbox_id}")

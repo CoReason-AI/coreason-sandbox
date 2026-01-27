@@ -1,0 +1,8 @@
+boto3==1.42.33
+docker==7.1.0
+e2b-code-interpreter==2.4.1
+loguru==0.7.2
+mcp==1.25.0
+packaging==26.0
+pydantic==2.12.5
+pydantic-settings==2.12.0

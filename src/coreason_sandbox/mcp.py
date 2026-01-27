@@ -21,13 +21,18 @@ from coreason_sandbox.session_manager import Session, SessionManager
 
 
 class SandboxMCP:
-    """
-    MCP-compliant server logic wrapper for Coreason Sandbox.
-    Exposes tools for the Agent.
-    Delegates session lifecycle management to SessionManager.
+    """MCP-compliant server logic wrapper for Coreason Sandbox.
+
+    Exposes tools for the Agent and delegates session lifecycle management to
+    SessionManager.
     """
 
     def __init__(self, config: SandboxConfig | None = None):
+        """Initializes the SandboxMCP.
+
+        Args:
+            config: Optional configuration object. If not provided, defaults are used.
+        """
         self.config = config or SandboxConfig()
 
         self.veritas = VeritasIntegrator(enabled=self.config.enable_audit_logging)
@@ -48,10 +53,19 @@ class SandboxMCP:
 
     @asynccontextmanager
     async def _session_scope(self, session_id: str) -> AsyncIterator[Session]:
-        """
-        Context manager to acquire a locked, active session.
+        """Context manager to acquire a locked, active session.
+
         Retries if session is terminated during acquisition (race condition).
         Updates last_accessed time on exit.
+
+        Args:
+            session_id: The unique identifier for the session.
+
+        Yields:
+            Session: An active, locked session.
+
+        Raises:
+            ValueError: If session_id is empty.
         """
         if not session_id:
             raise ValueError("Session ID is required")
@@ -75,9 +89,15 @@ class SandboxMCP:
     async def execute_code(
         self, session_id: str, language: Literal["python", "bash", "r"], code: str
     ) -> dict[str, str | int | float | list[dict[str, Any]]]:
-        """
-        Execute code in the sandbox for the given session.
-        Retries if session is terminated during acquisition.
+        """Execute code in the sandbox for the given session.
+
+        Args:
+            session_id: The unique identifier for the session.
+            language: The programming language to use ('python', 'bash', 'r').
+            code: The source code to execute.
+
+        Returns:
+            dict: A dictionary containing stdout, stderr, exit_code, duration, and artifacts.
         """
         async with self._session_scope(session_id) as session:
             # Veritas Audit Log
@@ -104,8 +124,14 @@ class SandboxMCP:
         }
 
     async def install_package(self, session_id: str, package_name: str) -> str:
-        """
-        Install a package in the sandbox session.
+        """Install a package in the sandbox session.
+
+        Args:
+            session_id: The unique identifier for the session.
+            package_name: The name of the package to install.
+
+        Returns:
+            str: A success message.
         """
         async with self._session_scope(session_id) as session:
             await session.runtime.install_package(package_name)
@@ -113,8 +139,14 @@ class SandboxMCP:
         return f"Package {package_name} installed successfully."
 
     async def list_files(self, session_id: str, path: str = ".") -> list[str]:
-        """
-        List files in the sandbox session directory.
+        """List files in the sandbox session directory.
+
+        Args:
+            session_id: The unique identifier for the session.
+            path: The directory path to list (default: ".").
+
+        Returns:
+            list[str]: A list of filenames.
         """
         async with self._session_scope(session_id) as session:
             files = await session.runtime.list_files(path)
@@ -122,7 +154,8 @@ class SandboxMCP:
         return files
 
     async def shutdown(self) -> None:
-        """
-        Terminate all sessions and stop the reaper.
+        """Terminate all sessions and stop the reaper.
+
+        Delegates to SessionManager.shutdown().
         """
         await self.session_manager.shutdown()

@@ -12,8 +12,14 @@ from pydantic import BaseModel
 
 
 class FileReference(BaseModel):
-    """
-    Represents a file artifact generated or manipulated within the sandbox.
+    """Represents a file artifact generated or manipulated within the sandbox.
+
+    Attributes:
+        filename: The original name of the file.
+        path: The path to the file (local or remote).
+        content_type: The MIME type of the file content.
+        size_bytes: The size of the file in bytes.
+        url: A URL (e.g., S3 signed URL or data URI) to access the file content.
     """
 
     filename: str
@@ -24,8 +30,14 @@ class FileReference(BaseModel):
 
 
 class ExecutionResult(BaseModel):
-    """
-    Represents the result of a code execution within the sandbox.
+    """Represents the result of a code execution within the sandbox.
+
+    Attributes:
+        stdout: Standard output captured from the execution.
+        stderr: Standard error captured from the execution.
+        exit_code: The exit code of the process (0 for success).
+        artifacts: A list of file artifacts generated during execution.
+        execution_duration: The duration of the execution in seconds.
     """
 
     stdout: str

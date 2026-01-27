@@ -22,9 +22,12 @@ sandbox = SandboxMCP()
 
 @asynccontextmanager
 async def lifespan(server: FastMCP) -> AsyncIterator[None]:
-    """
-    Manage lifecycle of the MCP server.
+    """Manage lifecycle of the MCP server.
+
     Ensures that the sandbox background tasks are cleaned up on shutdown.
+
+    Args:
+        server: The FastMCP server instance.
     """
     yield
     await sandbox.shutdown()
@@ -38,9 +41,15 @@ mcp = FastMCP("coreason-sandbox", lifespan=lifespan)
 async def execute_code(
     session_id: str, language: Literal["python", "bash", "r"], code: str
 ) -> list[TextContent | ImageContent]:
-    """
-    Execute code in the sandbox.
-    Returns stdout, stderr, and any generated image artifacts.
+    """Execute code in the sandbox.
+
+    Args:
+        session_id: The unique identifier for the session.
+        language: The programming language to use ('python', 'bash', 'r').
+        code: The source code to execute.
+
+    Returns:
+        list[TextContent | ImageContent]: A list containing stdout, stderr, and any generated image artifacts.
     """
     try:
         # execute_code returns a dict with stdout, stderr, exit_code, artifacts
@@ -118,8 +127,14 @@ async def execute_code(
 
 @mcp.tool()  # type: ignore[misc]
 async def install_package(session_id: str, package_name: str) -> str:
-    """
-    Install a package in the sandbox session.
+    """Install a package in the sandbox session.
+
+    Args:
+        session_id: The unique identifier for the session.
+        package_name: The name of the package to install.
+
+    Returns:
+        str: A success message or error description.
     """
     try:
         return await sandbox.install_package(session_id, package_name)
@@ -129,8 +144,14 @@ async def install_package(session_id: str, package_name: str) -> str:
 
 @mcp.tool()  # type: ignore[misc]
 async def list_files(session_id: str, path: str = ".") -> list[str]:
-    """
-    List files in the sandbox session directory.
+    """List files in the sandbox session directory.
+
+    Args:
+        session_id: The unique identifier for the session.
+        path: The directory path to list (default: ".").
+
+    Returns:
+        list[str]: A list of filenames or error description.
     """
     try:
         return await sandbox.list_files(session_id, path)
