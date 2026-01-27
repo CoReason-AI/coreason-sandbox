@@ -51,7 +51,7 @@ async def test_download_file_not_found_exception(docker_runtime: DockerRuntime, 
     docker_runtime.container.get_archive.side_effect = NotFound("File not found")
 
     dest = tmp_path / "dest.txt"
-    with pytest.raises(DockerException):
+    with pytest.raises(FileNotFoundError):
         await docker_runtime.download("remote.txt", dest)
 
 

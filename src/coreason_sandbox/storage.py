@@ -10,6 +10,7 @@
 
 from pathlib import Path
 
+import anyio
 import boto3
 from botocore.exceptions import ClientError
 from loguru import logger
@@ -44,7 +45,7 @@ class S3Storage:
             endpoint_url=endpoint_url,
         )
 
-    def upload_file(self, file_path: Path, object_name: str) -> str:
+    async def upload_file(self, file_path: Path, object_name: str) -> str:
         """Uploads a file to S3 and returns a presigned URL.
 
         Args:
@@ -63,9 +64,8 @@ class S3Storage:
 
         logger.info(f"Uploading {file_path} to s3://{self.bucket}/{object_name}")
 
-        try:
+        def _upload_and_sign() -> str:
             self.client.upload_file(str(file_path), self.bucket, object_name)
-
             # Generate signed URL (valid for 1 hour)
             url: str = self.client.generate_presigned_url(
                 ClientMethod="get_object",
@@ -73,6 +73,9 @@ class S3Storage:
                 ExpiresIn=3600,
             )
             return url
+
+        try:
+            return await anyio.to_thread.run_sync(_upload_and_sign)
         except ClientError as e:
             logger.error(f"Failed to upload file to S3: {e}")
             raise

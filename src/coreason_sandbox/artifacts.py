@@ -3,13 +3,14 @@ import mimetypes
 from pathlib import Path
 from typing import Protocol
 
+import aiofiles
 from coreason_sandbox.models import FileReference
 
 
 class ObjectStorage(Protocol):
     """Protocol for object storage backends (e.g., S3)."""
 
-    def upload_file(self, file_path: Path, object_name: str) -> str:
+    async def upload_file(self, file_path: Path, object_name: str) -> str:
         """Uploads a file to object storage and returns an access URL.
 
         Args:
@@ -33,7 +34,7 @@ class ArtifactManager:
         """
         self.storage = storage
 
-    def process_file(self, file_path: Path, original_filename: str) -> FileReference:
+    async def process_file(self, file_path: Path, original_filename: str) -> FileReference:
         """Process a local file (downloaded from sandbox) and return a FileReference.
 
         Converts images to Base64 data URIs.
@@ -65,14 +66,15 @@ class ArtifactManager:
 
         # Image processing
         if mime_type.startswith("image/"):
-            with open(file_path, "rb") as f:
-                encoded = base64.b64encode(f.read()).decode("utf-8")
+            async with aiofiles.open(file_path, "rb") as f:
+                content = await f.read()
+                encoded = base64.b64encode(content).decode("utf-8")
                 file_ref.url = f"data:{mime_type};base64,{encoded}"
 
         # Document/Other processing
         elif self.storage:
             try:
-                url = self.storage.upload_file(file_path, original_filename)
+                url = await self.storage.upload_file(file_path, original_filename)
                 file_ref.url = url
             except Exception:  # pragma: no cover
                 # Fallback or log error? For now, leave URL empty if upload fails

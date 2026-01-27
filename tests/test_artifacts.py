@@ -1,5 +1,5 @@
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from coreason_sandbox.runtimes.docker import DockerRuntime
@@ -79,7 +79,7 @@ async def test_artifact_manager_processing(tmp_path: Any) -> None:
     img_path = tmp_path / "test.png"
     img_path.write_bytes(b"image_data")
 
-    ref = manager.process_file(img_path, "test.png")
+    ref = await manager.process_file(img_path, "test.png")
     assert ref.content_type == "image/png"
     assert ref.url is not None and "base64" in ref.url
 
@@ -87,7 +87,7 @@ async def test_artifact_manager_processing(tmp_path: Any) -> None:
     txt_path = tmp_path / "test.txt"
     txt_path.write_text("hello")
 
-    ref = manager.process_file(txt_path, "test.txt")
+    ref = await manager.process_file(txt_path, "test.txt")
     assert ref.content_type == "text/plain"
     assert ref.url is None  # No storage configured
 
@@ -97,13 +97,15 @@ async def test_artifact_manager_storage(tmp_path: Any) -> None:
     from coreason_sandbox.artifacts import ArtifactManager
 
     mock_storage = MagicMock()
-    mock_storage.upload_file.return_value = "http://s3/test.pdf"
+    # Mock upload_file to return a coroutine result or use AsyncMock
+    mock_storage.upload_file = AsyncMock(return_value="http://s3/test.pdf")
 
     manager = ArtifactManager(storage=mock_storage)
 
     pdf_path = tmp_path / "test.pdf"
     pdf_path.write_bytes(b"pdf_data")
 
-    ref = manager.process_file(pdf_path, "test.pdf")
+    ref = await manager.process_file(pdf_path, "test.pdf")
     assert ref.content_type == "application/pdf"
     assert ref.url == "http://s3/test.pdf"
+    mock_storage.upload_file.assert_awaited_once()

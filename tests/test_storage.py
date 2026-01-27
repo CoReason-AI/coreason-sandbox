@@ -25,7 +25,8 @@ def test_s3_storage_init(mock_boto3: Any) -> None:
     assert storage.bucket == "my-bucket"
 
 
-def test_s3_upload_success(mock_boto3: Any, tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_s3_upload_success(mock_boto3: Any, tmp_path: Path) -> None:
     storage = S3Storage(bucket="my-bucket")
     mock_client = mock_boto3.client.return_value
     mock_client.generate_presigned_url.return_value = "https://s3/url"
@@ -33,19 +34,21 @@ def test_s3_upload_success(mock_boto3: Any, tmp_path: Path) -> None:
     test_file = tmp_path / "test.txt"
     test_file.write_text("content")
 
-    url = storage.upload_file(test_file, "remote.txt")
+    url = await storage.upload_file(test_file, "remote.txt")
 
     mock_client.upload_file.assert_called_with(str(test_file), "my-bucket", "remote.txt")
     assert url == "https://s3/url"
 
 
-def test_s3_upload_file_not_found(mock_boto3: Any) -> None:
+@pytest.mark.asyncio
+async def test_s3_upload_file_not_found(mock_boto3: Any) -> None:
     storage = S3Storage(bucket="my-bucket")
     with pytest.raises(FileNotFoundError):
-        storage.upload_file(Path("nonexistent"), "key")
+        await storage.upload_file(Path("nonexistent"), "key")
 
 
-def test_s3_upload_client_error(mock_boto3: Any, tmp_path: Path) -> None:
+@pytest.mark.asyncio
+async def test_s3_upload_client_error(mock_boto3: Any, tmp_path: Path) -> None:
     storage = S3Storage(bucket="my-bucket")
     mock_client = mock_boto3.client.return_value
     mock_client.upload_file.side_effect = ClientError({"Error": {"Code": "403", "Message": "Forbidden"}}, "PutObject")
@@ -54,4 +57,4 @@ def test_s3_upload_client_error(mock_boto3: Any, tmp_path: Path) -> None:
     test_file.write_text("content")
 
     with pytest.raises(ClientError):
-        storage.upload_file(test_file, "key")
+        await storage.upload_file(test_file, "key")
