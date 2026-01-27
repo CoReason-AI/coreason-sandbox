@@ -227,7 +227,7 @@ class E2BRuntime(SandboxRuntime):
             new_files = files_after - files_before
 
             if new_files:
-                with tempfile.TemporaryDirectory() as tmp_dir_str:
+                with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir_str:
                     tmp_dir = Path(tmp_dir_str)
                     for filename in new_files:
                         remote_path = filename

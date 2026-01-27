@@ -128,7 +128,7 @@ class DockerRuntime(SandboxRuntime):
         Download package wheels and package them into a tar stream.
         Runs synchronously (CPU/IO bound).
         """
-        with tempfile.TemporaryDirectory() as temp_dir_str:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir_str:
             temp_dir = Path(temp_dir_str)
             cmd = [
                 sys.executable,
@@ -170,6 +170,7 @@ class DockerRuntime(SandboxRuntime):
                     check=True,
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
                 )
             except subprocess.CalledProcessError as e:
                 logger.error(f"Failed to download package {package_name} on host: {e.stderr}")
@@ -304,7 +305,7 @@ class DockerRuntime(SandboxRuntime):
 
             artifacts: list[FileReference] = []
 
-            with tempfile.TemporaryDirectory() as tmp_dir_str:
+            with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir_str:
                 tmp_dir = Path(tmp_dir_str)
                 for filename in new_files:
                     remote_path = f"{self.work_dir}/{filename}"
