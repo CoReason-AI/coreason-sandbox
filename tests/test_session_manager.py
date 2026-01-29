@@ -56,7 +56,7 @@ async def test_session_creation_invalid_id(mock_user_context: Any) -> None:
 async def test_session_creation_invalid_context() -> None:
     manager = SessionManager()
     with pytest.raises(ValueError, match="UserContext is required"):
-        await manager.get_or_create_session("sess", None)  # type: ignore
+        await manager.get_or_create_session("sess", None)
 
 
 @pytest.mark.asyncio
