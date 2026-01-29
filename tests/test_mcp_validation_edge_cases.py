@@ -61,9 +61,7 @@ async def test_mcp_validation_whitespace_session_id(
 
 
 @pytest.mark.asyncio
-async def test_mcp_validation_long_session_id(
-    mock_factory: Any, mock_runtime: Any, mock_user_context: Any
-) -> None:
+async def test_mcp_validation_long_session_id(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     """Ensure very long session IDs are handled correctly."""
     mcp = SandboxMCP()
     session_id = "a" * 1024
