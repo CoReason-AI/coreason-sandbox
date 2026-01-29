@@ -21,7 +21,7 @@ def docker_runtime(mock_docker_client: Any) -> DockerRuntime:
 
 
 @pytest.mark.asyncio
-async def test_upload_exception(docker_runtime: DockerRuntime, tmp_path: Any) -> None:
+async def test_upload_exception(docker_runtime: DockerRuntime, tmp_path: Any, mock_user_context: Any) -> None:
     local_file = tmp_path / "test.txt"
     local_file.write_text("content")
 
@@ -31,32 +31,36 @@ async def test_upload_exception(docker_runtime: DockerRuntime, tmp_path: Any) ->
 
     # Current implementation logs error and re-raises
     with pytest.raises(DockerException):
-        await docker_runtime.upload(local_file, "remote.txt")
+        await docker_runtime.upload(local_file, "remote.txt", mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_download_docker_exception(docker_runtime: DockerRuntime, tmp_path: Any) -> None:
+async def test_download_docker_exception(docker_runtime: DockerRuntime, tmp_path: Any, mock_user_context: Any) -> None:
     assert docker_runtime.container is not None
     docker_runtime.container.get_archive.side_effect = DockerException("Download failed")
 
     dest = tmp_path / "dest.txt"
     with pytest.raises(DockerException):
-        await docker_runtime.download("remote.txt", dest)
+        await docker_runtime.download("remote.txt", dest, mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_download_file_not_found_exception(docker_runtime: DockerRuntime, tmp_path: Any) -> None:
+async def test_download_file_not_found_exception(
+    docker_runtime: DockerRuntime, tmp_path: Any, mock_user_context: Any
+) -> None:
     assert docker_runtime.container is not None
     # Simulate NotFound from Docker (subclass of DockerException)
     docker_runtime.container.get_archive.side_effect = NotFound("File not found")
 
     dest = tmp_path / "dest.txt"
     with pytest.raises(FileNotFoundError):
-        await docker_runtime.download("remote.txt", dest)
+        await docker_runtime.download("remote.txt", dest, mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_download_tar_extraction_exception(docker_runtime: DockerRuntime, tmp_path: Any) -> None:
+async def test_download_tar_extraction_exception(
+    docker_runtime: DockerRuntime, tmp_path: Any, mock_user_context: Any
+) -> None:
     assert docker_runtime.container is not None
     # Mock success for get_archive but return empty/invalid tar?
     # get_archive returns (bits, stat)
@@ -76,11 +80,13 @@ async def test_download_tar_extraction_exception(docker_runtime: DockerRuntime, 
     dest = tmp_path / "dest.txt"
     # Logic: member = tar.next(); if member is None: raise FileNotFoundError
     with pytest.raises(FileNotFoundError):
-        await docker_runtime.download("remote.txt", dest)
+        await docker_runtime.download("remote.txt", dest, mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_download_tar_extract_file_none(docker_runtime: DockerRuntime, tmp_path: Any) -> None:
+async def test_download_tar_extract_file_none(
+    docker_runtime: DockerRuntime, tmp_path: Any, mock_user_context: Any
+) -> None:
     assert docker_runtime.container is not None
 
     # Mock a tar with a directory member (extractfile returns None)
@@ -98,4 +104,4 @@ async def test_download_tar_extract_file_none(docker_runtime: DockerRuntime, tmp
 
     dest = tmp_path / "dest.txt"
     with pytest.raises(RuntimeError, match="Failed to extract file"):
-        await docker_runtime.download("remote", dest)
+        await docker_runtime.download("remote", dest, mock_user_context, "sid")

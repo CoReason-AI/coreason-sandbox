@@ -22,13 +22,13 @@ def docker_runtime(mock_docker_client: Any) -> Any:
 
 
 @pytest.mark.asyncio
-async def test_install_package_success(docker_runtime: Any) -> None:
+async def test_install_package_success(docker_runtime: Any, mock_user_context: Any) -> None:
     # 1. Download/tar (mocked)
     with patch("coreason_sandbox.runtimes.docker.DockerRuntime._download_and_package", return_value=b"tar_data"):
         # 2. Upload/install (mocked container)
         docker_runtime.container.exec_run.return_value = (0, b"Success")
 
-        await docker_runtime.install_package("pandas")
+        await docker_runtime.install_package("pandas", mock_user_context, "sid")
 
         # Verify upload
         docker_runtime.container.put_archive.assert_called_once()
@@ -49,46 +49,46 @@ async def test_install_package_success(docker_runtime: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_install_package_not_allowed(docker_runtime: Any) -> None:
+async def test_install_package_not_allowed(docker_runtime: Any, mock_user_context: Any) -> None:
     # requests is not in allowed_packages={"pandas"}
     with pytest.raises(ValueError, match="is not in the allowed list"):
-        await docker_runtime.install_package("requests")
+        await docker_runtime.install_package("requests", mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_install_package_invalid_name(docker_runtime: Any) -> None:
+async def test_install_package_invalid_name(docker_runtime: Any, mock_user_context: Any) -> None:
     """Test that invalid package names raise ValueError."""
     with pytest.raises(ValueError, match="Invalid package requirement"):
-        await docker_runtime.install_package("!invalid-package-name")
+        await docker_runtime.install_package("!invalid-package-name", mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_install_package_install_failed(docker_runtime: Any) -> None:
+async def test_install_package_install_failed(docker_runtime: Any, mock_user_context: Any) -> None:
     with patch("coreason_sandbox.runtimes.docker.DockerRuntime._download_and_package", return_value=b"tar_data"):
         docker_runtime.container.exec_run.return_value = (1, b"Install error")
 
         with pytest.raises(RuntimeError, match="Failed to install package"):
-            await docker_runtime.install_package("pandas")
+            await docker_runtime.install_package("pandas", mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_install_package_download_failed(docker_runtime: Any) -> None:
+async def test_install_package_download_failed(docker_runtime: Any, mock_user_context: Any) -> None:
     """Test re-raising RuntimeError from _download_and_package."""
     with patch(
         "coreason_sandbox.runtimes.docker.DockerRuntime._download_and_package",
         side_effect=RuntimeError("Download fail"),
     ):
         with pytest.raises(RuntimeError, match="Download fail"):
-            await docker_runtime.install_package("pandas")
+            await docker_runtime.install_package("pandas", mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_install_package_no_container(mock_docker_client: Any) -> None:
+async def test_install_package_no_container(mock_docker_client: Any, mock_user_context: Any) -> None:
     """Test installing package without a started container."""
     # Ensure mock_docker_client is used to avoid real docker connection
     runtime = DockerRuntime()  # Not started
     with pytest.raises(RuntimeError, match="Sandbox not started"):
-        await runtime.install_package("pandas")
+        await runtime.install_package("pandas", mock_user_context, "sid")
 
 
 def test_download_and_package_logic(docker_runtime: Any) -> None:

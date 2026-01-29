@@ -79,33 +79,33 @@ async def test_terminate_failure(docker_runtime: DockerRuntime) -> None:
 
 
 @pytest.mark.asyncio
-async def test_list_files_success(docker_runtime: DockerRuntime) -> None:
+async def test_list_files_success(docker_runtime: DockerRuntime, mock_user_context: Any) -> None:
     docker_runtime.container = MagicMock()
     docker_runtime.container.exec_run.return_value = (0, b"file1\nfile2\n")
 
-    files = await docker_runtime.list_files(".")
+    files = await docker_runtime.list_files(".", mock_user_context, "sid")
 
     assert files == ["file1", "file2"]
 
 
 @pytest.mark.asyncio
-async def test_list_files_failure(docker_runtime: DockerRuntime) -> None:
+async def test_list_files_failure(docker_runtime: DockerRuntime, mock_user_context: Any) -> None:
     docker_runtime.container = MagicMock()
     docker_runtime.container.exec_run.return_value = (1, b"Error")
 
-    files = await docker_runtime.list_files(".")
+    files = await docker_runtime.list_files(".", mock_user_context, "sid")
     assert files == []
 
 
 @pytest.mark.asyncio
-async def test_list_files_no_container(docker_runtime: DockerRuntime) -> None:
+async def test_list_files_no_container(docker_runtime: DockerRuntime, mock_user_context: Any) -> None:
     with pytest.raises(RuntimeError, match="Sandbox not started"):
-        await docker_runtime.list_files(".")
+        await docker_runtime.list_files(".", mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_list_files_internal_exception(docker_runtime: DockerRuntime) -> None:
+async def test_list_files_internal_exception(docker_runtime: DockerRuntime, mock_user_context: Any) -> None:
     # _list_files_internal suppresses exceptions
     with patch.object(docker_runtime, "list_files", side_effect=Exception("Fail")):
-        files = await docker_runtime._list_files_internal(".")
+        files = await docker_runtime._list_files_internal(".", mock_user_context, "sid")
         assert files == set()

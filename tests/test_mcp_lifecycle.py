@@ -35,12 +35,12 @@ def mock_veritas() -> Any:
 
 
 @pytest.mark.asyncio
-async def test_session_creation_and_reuse(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_session_creation_and_reuse(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     mcp = SandboxMCP()
 
     # 1. Create Session
     session_id = "sess_1"
-    session1 = await mcp.session_manager.get_or_create_session(session_id)
+    session1 = await mcp.session_manager.get_or_create_session(session_id, mock_user_context)
     assert session1.runtime == mock_runtime
     mock_runtime.start.assert_called_once()
     assert session_id in mcp.sessions
@@ -51,7 +51,7 @@ async def test_session_creation_and_reuse(mock_factory: Any, mock_runtime: Any) 
     # 2. Reuse Session
     # Ensure time advances slightly
     with patch("coreason_sandbox.session_manager.time.time", return_value=ts1 + 10):
-        session1_again = await mcp.session_manager.get_or_create_session(session_id)
+        session1_again = await mcp.session_manager.get_or_create_session(session_id, mock_user_context)
         assert session1_again is session1
         assert session1_again.last_accessed == ts1 + 10
 
@@ -62,7 +62,7 @@ async def test_session_creation_and_reuse(mock_factory: Any, mock_runtime: Any) 
 
 
 @pytest.mark.asyncio
-async def test_reaper_terminates_expired_sessions(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_reaper_terminates_expired_sessions(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     # Config: Check every 0.01s, expire after 100s
     config = SandboxConfig(idle_timeout=100.0, reaper_interval=0.01)
     mcp = SandboxMCP(config)
@@ -71,7 +71,7 @@ async def test_reaper_terminates_expired_sessions(mock_factory: Any, mock_runtim
     start_time = 1000.0
 
     with patch("coreason_sandbox.session_manager.time.time", return_value=start_time):
-        await mcp.session_manager.get_or_create_session("expired_session")
+        await mcp.session_manager.get_or_create_session("expired_session", mock_user_context)
 
     assert "expired_session" in mcp.sessions
 
@@ -90,7 +90,7 @@ async def test_reaper_terminates_expired_sessions(mock_factory: Any, mock_runtim
 
 
 @pytest.mark.asyncio
-async def test_reaper_ignores_active_sessions(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_reaper_ignores_active_sessions(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     # Config: Check every 0.01s, expire after 100s
     config = SandboxConfig(idle_timeout=100.0, reaper_interval=0.01)
     mcp = SandboxMCP(config)
@@ -98,7 +98,7 @@ async def test_reaper_ignores_active_sessions(mock_factory: Any, mock_runtime: A
     start_time = 1000.0
 
     with patch("coreason_sandbox.session_manager.time.time", return_value=start_time):
-        await mcp.session_manager.get_or_create_session("active_session")
+        await mcp.session_manager.get_or_create_session("active_session", mock_user_context)
 
     # Advance time within timeout (1000 + 50)
     future_time = start_time + 50.0
@@ -114,10 +114,10 @@ async def test_reaper_ignores_active_sessions(mock_factory: Any, mock_runtime: A
 
 
 @pytest.mark.asyncio
-async def test_shutdown_cleans_up(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_shutdown_cleans_up(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     mcp = SandboxMCP()
-    await mcp.session_manager.get_or_create_session("s1")
-    await mcp.session_manager.get_or_create_session("s2")
+    await mcp.session_manager.get_or_create_session("s1", mock_user_context)
+    await mcp.session_manager.get_or_create_session("s2", mock_user_context)
 
     assert len(mcp.sessions) == 2
     assert mcp._reaper_task is not None
@@ -130,7 +130,7 @@ async def test_shutdown_cleans_up(mock_factory: Any, mock_runtime: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_concurrent_access_sequentiality(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_concurrent_access_sequentiality(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     """Ensure session lock prevents concurrent execution on the same session."""
     mcp = SandboxMCP()
     session_id = "sess_lock"
@@ -143,8 +143,8 @@ async def test_concurrent_access_sequentiality(mock_factory: Any, mock_runtime: 
     mock_runtime.execute.side_effect = slow_execute
 
     # Start two executions concurrently
-    t1 = asyncio.create_task(mcp.execute_code(session_id, "python", "1"))
-    t2 = asyncio.create_task(mcp.execute_code(session_id, "python", "2"))
+    t1 = asyncio.create_task(mcp.execute_code(session_id, "python", "1", mock_user_context))
+    t2 = asyncio.create_task(mcp.execute_code(session_id, "python", "2", mock_user_context))
 
     start = time.time()
     await asyncio.gather(t1, t2)

@@ -4,6 +4,7 @@ from typing import AsyncGenerator
 import docker
 import pytest
 import pytest_asyncio
+from coreason_identity.models import UserContext
 from coreason_sandbox.models import ExecutionResult
 from coreason_sandbox.runtimes.docker import DockerRuntime
 
@@ -41,7 +42,9 @@ async def live_docker_runtime() -> AsyncGenerator[DockerRuntime, None]:
 
 @pytest.mark.live
 @pytest.mark.asyncio
-async def test_docker_runtime_live_lifecycle(live_docker_runtime: DockerRuntime) -> None:
+async def test_docker_runtime_live_lifecycle(
+    live_docker_runtime: DockerRuntime, mock_user_context: UserContext
+) -> None:
     """
     Live integration test for DockerRuntime lifecycle.
     Verifies: Execute Python and Bash on a REAL container.
@@ -52,7 +55,7 @@ async def test_docker_runtime_live_lifecycle(live_docker_runtime: DockerRuntime)
     # 1. Execute Python
     print("Executing Python code...")
     code = "print('Hello Live World')"
-    result = await runtime.execute(code, "python")
+    result = await runtime.execute(code, "python", mock_user_context, "sid")
 
     assert isinstance(result, ExecutionResult)
     assert result.exit_code == 0
@@ -62,14 +65,16 @@ async def test_docker_runtime_live_lifecycle(live_docker_runtime: DockerRuntime)
     # 2. Execute Bash
     print("Executing Bash code...")
     code_bash = "echo 'Hello Bash'"
-    result_bash = await runtime.execute(code_bash, "bash")
+    result_bash = await runtime.execute(code_bash, "bash", mock_user_context, "sid")
     assert result_bash.exit_code == 0
     assert "Hello Bash" in result_bash.stdout.strip()
 
 
 @pytest.mark.live
 @pytest.mark.asyncio
-async def test_docker_io_live(live_docker_runtime: DockerRuntime, tmp_path: Path) -> None:
+async def test_docker_io_live(
+    live_docker_runtime: DockerRuntime, tmp_path: Path, mock_user_context: UserContext
+) -> None:
     """
     Live integration test for File I/O.
     Verifies: Upload -> Execute (read/write) -> Download.
@@ -83,10 +88,10 @@ async def test_docker_io_live(live_docker_runtime: DockerRuntime, tmp_path: Path
 
     # 2. Upload
     remote_path = "/home/user/uploaded.txt"
-    await runtime.upload(local_file, remote_path)
+    await runtime.upload(local_file, remote_path, mock_user_context, "sid")
 
     # Verify existence with bash
-    ls_result = await runtime.execute(f"cat {remote_path}", "bash")
+    ls_result = await runtime.execute(f"cat {remote_path}", "bash", mock_user_context, "sid")
     assert ls_result.exit_code == 0
     assert ls_result.stdout.strip() == test_content
 
@@ -95,10 +100,10 @@ async def test_docker_io_live(live_docker_runtime: DockerRuntime, tmp_path: Path
 with open('/home/user/generated.txt', 'w') as f:
     f.write('Generated Content')
 """
-    await runtime.execute(code, "python")
+    await runtime.execute(code, "python", mock_user_context, "sid")
 
     download_path = tmp_path / "downloaded.txt"
-    await runtime.download("/home/user/generated.txt", download_path)
+    await runtime.download("/home/user/generated.txt", download_path, mock_user_context, "sid")
 
     assert download_path.exists()
     assert download_path.read_text() == "Generated Content"
@@ -106,7 +111,7 @@ with open('/home/user/generated.txt', 'w') as f:
 
 @pytest.mark.live
 @pytest.mark.asyncio
-async def test_docker_isolation_live(live_docker_runtime: DockerRuntime) -> None:
+async def test_docker_isolation_live(live_docker_runtime: DockerRuntime, mock_user_context: UserContext) -> None:
     """
     Live integration test for concurrency/isolation.
     Starts a SECOND runtime to ensure it's distinct from the fixture's runtime.
@@ -126,10 +131,10 @@ async def test_docker_isolation_live(live_docker_runtime: DockerRuntime) -> None
         assert runtime1.container.id != runtime2.container.id
 
         # Write to Runtime 1
-        await runtime1.execute("touch /home/user/unique_file", "bash")
+        await runtime1.execute("touch /home/user/unique_file", "bash", mock_user_context, "sid1")
 
         # Check Runtime 2 (should not have file)
-        result = await runtime2.execute("ls /home/user/unique_file", "bash")
+        result = await runtime2.execute("ls /home/user/unique_file", "bash", mock_user_context, "sid2")
         assert result.exit_code != 0  # Should fail
 
     except (docker.errors.DockerException, docker.errors.APIError) as e:

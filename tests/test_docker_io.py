@@ -23,12 +23,12 @@ def docker_runtime(mock_docker_client: Any) -> DockerRuntime:
 
 
 @pytest.mark.asyncio
-async def test_upload_success(docker_runtime: DockerRuntime, tmp_path: Any) -> None:
+async def test_upload_success(docker_runtime: DockerRuntime, tmp_path: Any, mock_user_context: Any) -> None:
     # Create a dummy local file
     local_file = tmp_path / "test.txt"
     local_file.write_text("content")
 
-    await docker_runtime.upload(local_file, "/remote/path/test.txt")
+    await docker_runtime.upload(local_file, "/remote/path/test.txt", mock_user_context, "sid")
 
     # We mock container, so we access it via the property but need to assert it's not None
     assert docker_runtime.container is not None
@@ -48,24 +48,24 @@ async def test_upload_success(docker_runtime: DockerRuntime, tmp_path: Any) -> N
 
 
 @pytest.mark.asyncio
-async def test_upload_no_file(docker_runtime: DockerRuntime, tmp_path: Any) -> None:
+async def test_upload_no_file(docker_runtime: DockerRuntime, tmp_path: Any, mock_user_context: Any) -> None:
     local_file = tmp_path / "non_existent.txt"
     with pytest.raises(FileNotFoundError):
-        await docker_runtime.upload(local_file, "/remote/path")
+        await docker_runtime.upload(local_file, "/remote/path", mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_upload_no_container(mock_docker_client: Any, tmp_path: Any) -> None:
+async def test_upload_no_container(mock_docker_client: Any, tmp_path: Any, mock_user_context: Any) -> None:
     runtime = DockerRuntime()
     local_file = tmp_path / "test.txt"
     local_file.write_text("content")
 
     with pytest.raises(RuntimeError, match="Sandbox not started"):
-        await runtime.upload(local_file, "/remote")
+        await runtime.upload(local_file, "/remote", mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_download_success(docker_runtime: DockerRuntime, tmp_path: Any) -> None:
+async def test_download_success(docker_runtime: DockerRuntime, tmp_path: Any, mock_user_context: Any) -> None:
     # Mock get_archive return value
     # Generator of bytes representing a tar file
     file_content = b"remote content"
@@ -81,14 +81,14 @@ async def test_download_success(docker_runtime: DockerRuntime, tmp_path: Any) ->
     docker_runtime.container.get_archive.return_value = ([tar_stream.getvalue()], {})
 
     dest_path = tmp_path / "downloaded.txt"
-    await docker_runtime.download("/remote/remote.txt", dest_path)
+    await docker_runtime.download("/remote/remote.txt", dest_path, mock_user_context, "sid")
 
     assert dest_path.exists()
     assert dest_path.read_bytes() == file_content
 
 
 @pytest.mark.asyncio
-async def test_download_not_found(docker_runtime: DockerRuntime, tmp_path: Any) -> None:
+async def test_download_not_found(docker_runtime: DockerRuntime, tmp_path: Any, mock_user_context: Any) -> None:
     # Simulate Docker NotFound exception
     assert docker_runtime.container is not None
     docker_runtime.container.get_archive.side_effect = NotFound("File not found")
@@ -97,12 +97,12 @@ async def test_download_not_found(docker_runtime: DockerRuntime, tmp_path: Any) 
     # Our code catches DockerException (parent of NotFound) and logs error but re-raises
 
     with pytest.raises((DockerException, FileNotFoundError, Exception)):
-        await docker_runtime.download("/remote/missing.txt", dest_path)
+        await docker_runtime.download("/remote/missing.txt", dest_path, mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_download_no_container(mock_docker_client: Any, tmp_path: Any) -> None:
+async def test_download_no_container(mock_docker_client: Any, tmp_path: Any, mock_user_context: Any) -> None:
     runtime = DockerRuntime()
     dest_path = tmp_path / "dest.txt"
     with pytest.raises(RuntimeError, match="Sandbox not started"):
-        await runtime.download("/remote", dest_path)
+        await runtime.download("/remote", dest_path, mock_user_context, "sid")
