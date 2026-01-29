@@ -11,9 +11,9 @@
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Literal, cast
 
+from coreason_identity.models import UserContext
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ImageContent, TextContent
-from coreason_identity.models import UserContext
 
 from coreason_sandbox.mcp import SandboxMCP
 
