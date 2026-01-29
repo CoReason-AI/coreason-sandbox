@@ -45,7 +45,7 @@ def test_execution_result_creation() -> None:
 def test_model_validation_failures() -> None:
     # Test missing required field in FileReference
     with pytest.raises(ValidationError) as excinfo:
-        FileReference(filename="test.png")  # type: ignore # Missing path
+        FileReference(filename="test.png")
     assert "path" in str(excinfo.value)
 
     # Test missing required field in ExecutionResult
@@ -55,7 +55,7 @@ def test_model_validation_failures() -> None:
             stderr="err",
             exit_code=0,
             # Missing artifacts and execution_duration
-        )  # type: ignore
+        )
     assert "artifacts" in str(excinfo.value)
     assert "execution_duration" in str(excinfo.value)
 
@@ -64,7 +64,7 @@ def test_model_validation_failures() -> None:
         ExecutionResult(
             stdout="out",
             stderr="err",
-            exit_code="not-an-int",  # type: ignore
+            exit_code="not-an-int",
             artifacts=[],
             execution_duration=1.0,
         )

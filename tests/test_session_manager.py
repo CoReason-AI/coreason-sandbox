@@ -94,7 +94,9 @@ async def test_session_access_denied(mock_factory: Any, mock_runtime: Any, mock_
 
 
 @pytest.mark.asyncio
-async def test_session_creation_race_condition_access_denied(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
+async def test_session_creation_race_condition_access_denied(
+    mock_factory: Any, mock_runtime: Any, mock_user_context: Any
+) -> None:
     """
     Test race condition where two users try to create the same session ID.
     User 1 gets the lock and creates it.
@@ -110,8 +112,7 @@ async def test_session_creation_race_condition_access_denied(mock_factory: Any, 
         permissions=[],
     )
 
-    # Mock runtime.start to sleep slightly, ensuring User 2 enters get_or_create_session
-    # and waits on the lock while User 1 is still "starting" the runtime inside the lock.
+    # Mock runtime.start to sleep slightly
     async def slow_start() -> None:
         await asyncio.sleep(0.1)
 
@@ -134,7 +135,9 @@ async def test_session_creation_race_condition_access_denied(mock_factory: Any, 
 
 
 @pytest.mark.asyncio
-async def test_session_creation_race_condition_access_allowed(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
+async def test_session_creation_race_condition_access_allowed(
+    mock_factory: Any, mock_runtime: Any, mock_user_context: Any
+) -> None:
     """
     Test race condition where two requests with SAME user try to create session.
     User 1 creates. User 2 waits for lock, then sees it created and succeeds.
