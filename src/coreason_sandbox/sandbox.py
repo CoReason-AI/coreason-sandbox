@@ -75,7 +75,7 @@ class SandboxAsync:
         """
         logger.info(
             "Executing code in sandbox",
-            user_id=context.sub,
+            user_id=context.user_id,
             session_id=self.session_id,
         )
         return await self.runtime.execute(code, language, context, self.session_id)
