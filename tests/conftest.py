@@ -42,4 +42,4 @@ def mock_vault_integrator() -> Generator[Any, None, None]:
 
 @pytest.fixture
 def mock_user_context() -> UserContext:
-    return UserContext(sub="test-user", email="test@example.com", permissions=["tester"])
+    return UserContext(user_id="test-user", email="test@example.com", scopes=["tester"])
