@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from coreason_identity.models import UserContext
+
 from coreason_sandbox.config import SandboxConfig
 from coreason_sandbox.session_manager import SessionManager
 
@@ -84,12 +85,12 @@ async def test_session_access_denied(mock_factory: Any, mock_runtime: Any, mock_
 
     # Try access with user2
     other_context = UserContext(
-        sub="other-user",
+        user_id="other-user",
         email="other@example.com",
-        permissions=[],
+        scopes=[],
     )
 
-    with pytest.raises(PermissionError, match="Session belongs to another user"):
+    with pytest.raises(PermissionError, match="does not belong to user"):
         await manager.get_or_create_session(session_id, other_context)
 
 
@@ -107,9 +108,9 @@ async def test_session_creation_race_condition_access_denied(
 
     # Define User 2 context
     user2_context = UserContext(
-        sub="user2",
+        user_id="user2",
         email="user2@example.com",
-        permissions=[],
+        scopes=[],
     )
 
     # Mock runtime.start to sleep slightly
@@ -130,7 +131,7 @@ async def test_session_creation_race_condition_access_denied(
     await task1
 
     # Task 2 should raise PermissionError
-    with pytest.raises(PermissionError, match="Session belongs to another user"):
+    with pytest.raises(PermissionError, match="does not belong to user"):
         await task2
 
 

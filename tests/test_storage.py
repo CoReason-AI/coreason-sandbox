@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 from botocore.exceptions import ClientError
+
 from coreason_sandbox.storage import S3Storage
 
 
@@ -37,7 +38,7 @@ async def test_s3_upload_success(mock_boto3: Any, tmp_path: Path, mock_user_cont
     url = await storage.upload_file(test_file, "remote.txt", mock_user_context, "sid")
 
     # Key includes artifacts/user_id/session_id/
-    expected_key = f"artifacts/{mock_user_context.sub}/sid/remote.txt"
+    expected_key = f"artifacts/{mock_user_context.user_id}/sid/remote.txt"
     mock_client.upload_file.assert_called_with(str(test_file), "my-bucket", expected_key)
     assert url == "https://s3/url"
 

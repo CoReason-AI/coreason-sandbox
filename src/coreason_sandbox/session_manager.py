@@ -74,9 +74,9 @@ class SessionManager:
         # Optimistic check
         if session_id in self.sessions:
             session = self.sessions[session_id]
-            if session.owner_id != context.sub:
-                logger.warning(f"Unauthorized access attempt to session {session_id} by {context.sub}")
-                raise PermissionError("Session belongs to another user")
+            if session.owner_id != context.user_id:
+                logger.warning(f"Unauthorized access attempt to session {session_id} by {context.user_id}")
+                raise PermissionError(f"Session {session_id} does not belong to user {context.user_id}")
             session.last_accessed = time.time()
             return session
 
@@ -84,16 +84,16 @@ class SessionManager:
             # Double-check inside lock
             if session_id in self.sessions:
                 session = self.sessions[session_id]
-                if session.owner_id != context.sub:
-                    logger.warning(f"Unauthorized access attempt to session {session_id} by {context.sub}")
-                    raise PermissionError("Session belongs to another user")
+                if session.owner_id != context.user_id:
+                    logger.warning(f"Unauthorized access attempt to session {session_id} by {context.user_id}")
+                    raise PermissionError(f"Session {session_id} does not belong to user {context.user_id}")
                 session.last_accessed = time.time()
                 return session
 
             runtime = SandboxFactory.get_runtime(self.config)
             logger.info(
                 "Allocating sandbox session",
-                user_id=context.sub,
+                user_id=context.user_id,
                 runtime=type(runtime).__name__,
             )
 
@@ -103,7 +103,7 @@ class SessionManager:
             session = Session(
                 runtime=runtime,
                 last_accessed=time.time(),
-                owner_id=context.sub,
+                owner_id=context.user_id,
             )
             self.sessions[session_id] = session
             return session

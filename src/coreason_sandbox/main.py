@@ -53,10 +53,9 @@ async def execute_code(
         list[TextContent | ImageContent]: A list containing stdout, stderr, and any generated image artifacts.
     """
     system_context = UserContext(
-        sub="cli-user",
+        user_id="cli-user",
         email="cli@coreason.ai",
-        permissions=["system"],
-        project_context="cli",
+        scopes=["system"],
     )
 
     try:
@@ -145,10 +144,9 @@ async def install_package(session_id: str, package_name: str) -> str:
         str: A success message or error description.
     """
     system_context = UserContext(
-        sub="cli-user",
+        user_id="cli-user",
         email="cli@coreason.ai",
-        permissions=["system"],
-        project_context="cli",
+        scopes=["system"],
     )
     try:
         return await sandbox.install_package(session_id, package_name, context=system_context)
@@ -168,10 +166,9 @@ async def list_files(session_id: str, path: str = ".") -> list[str]:
         list[str]: A list of filenames or error description.
     """
     system_context = UserContext(
-        sub="cli-user",
+        user_id="cli-user",
         email="cli@coreason.ai",
-        permissions=["system"],
-        project_context="cli",
+        scopes=["system"],
     )
     try:
         return await sandbox.list_files(session_id, context=system_context, path=path)

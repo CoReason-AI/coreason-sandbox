@@ -3,9 +3,10 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+from docker.errors import DockerException
+
 from coreason_sandbox.config import SandboxConfig
 from coreason_sandbox.mcp import SandboxMCP
-from docker.errors import DockerException
 
 
 @pytest.mark.asyncio

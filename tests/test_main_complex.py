@@ -13,8 +13,9 @@ from typing import Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from coreason_sandbox.main import execute_code
 from mcp.types import ImageContent, TextContent
+
+from coreason_sandbox.main import execute_code
 
 
 @pytest.fixture

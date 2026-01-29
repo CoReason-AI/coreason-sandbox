@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 import pytest
+
 from coreason_sandbox.integrations.veritas import VeritasIntegrator
 
 
