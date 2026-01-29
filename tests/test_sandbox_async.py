@@ -32,28 +32,28 @@ async def test_sandbox_async_lifecycle(mock_runtime: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_sandbox_async_execute(mock_runtime: Any) -> None:
+async def test_sandbox_async_execute(mock_runtime: Any, mock_user_context: Any) -> None:
     with patch("coreason_sandbox.sandbox.SandboxFactory.get_runtime", return_value=mock_runtime):
         async with SandboxAsync() as svc:
-            result = await svc.execute("print('hello')")
+            result = await svc.execute("print('hello')", mock_user_context)
             assert isinstance(result, ExecutionResult)
             assert result.stdout == "out"
-            mock_runtime.execute.assert_awaited_once_with("print('hello')", "python")
+            mock_runtime.execute.assert_awaited_once_with("print('hello')", "python", mock_user_context, svc.session_id)
 
 
 @pytest.mark.asyncio
-async def test_sandbox_async_methods(mock_runtime: Any, tmp_path: Any) -> None:
+async def test_sandbox_async_methods(mock_runtime: Any, tmp_path: Any, mock_user_context: Any) -> None:
     with patch("coreason_sandbox.sandbox.SandboxFactory.get_runtime", return_value=mock_runtime):
         async with SandboxAsync() as svc:
-            await svc.install_package("requests")
-            mock_runtime.install_package.assert_awaited_once_with("requests")
+            await svc.install_package("requests", mock_user_context)
+            mock_runtime.install_package.assert_awaited_once_with("requests", mock_user_context, svc.session_id)
 
-            await svc.list_files()
-            mock_runtime.list_files.assert_awaited_once_with(".")
+            await svc.list_files(mock_user_context)
+            mock_runtime.list_files.assert_awaited_once_with(".", mock_user_context, svc.session_id)
 
             local_path = tmp_path / "test.txt"
-            await svc.upload(local_path, "remote.txt")
-            mock_runtime.upload.assert_awaited_once_with(local_path, "remote.txt")
+            await svc.upload(local_path, "remote.txt", mock_user_context)
+            mock_runtime.upload.assert_awaited_once_with(local_path, "remote.txt", mock_user_context, svc.session_id)
 
-            await svc.download("remote.txt", local_path)
-            mock_runtime.download.assert_awaited_once_with("remote.txt", local_path)
+            await svc.download("remote.txt", local_path, mock_user_context)
+            mock_runtime.download.assert_awaited_once_with("remote.txt", local_path, mock_user_context, svc.session_id)

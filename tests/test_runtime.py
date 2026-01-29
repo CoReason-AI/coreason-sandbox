@@ -9,9 +9,10 @@
 # Source Code: https://github.com/CoReason-AI/coreason_sandbox
 
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import pytest
+from coreason_identity.models import UserContext
 from coreason_sandbox.models import ExecutionResult, FileReference
 from coreason_sandbox.runtime import SandboxRuntime
 
@@ -24,7 +25,13 @@ class MockRuntime(SandboxRuntime):
     async def start(self) -> None:
         self.is_running = True
 
-    async def execute(self, code: str, language: Literal["python", "bash", "r"]) -> ExecutionResult:
+    async def execute(
+        self,
+        code: str,
+        language: Literal["python", "bash", "r"],
+        context: UserContext,
+        session_id: str,
+    ) -> ExecutionResult:
         if not self.is_running:
             raise RuntimeError("Runtime not started")
 
@@ -42,22 +49,22 @@ class MockRuntime(SandboxRuntime):
             execution_duration=0.5,
         )
 
-    async def upload(self, local_path: Path, remote_path: str) -> None:
+    async def upload(self, local_path: Path, remote_path: str, context: UserContext, session_id: str) -> None:
         if not self.is_running:
             raise RuntimeError("Runtime not started")
         self.files.add(remote_path)
 
-    async def download(self, remote_path: str, local_path: Path) -> None:
+    async def download(self, remote_path: str, local_path: Path, context: UserContext, session_id: str) -> None:
         if not self.is_running:
             raise RuntimeError("Runtime not started")
         if remote_path not in self.files:
             raise FileNotFoundError(f"File {remote_path} not found")
 
-    async def install_package(self, package_name: str) -> None:
+    async def install_package(self, package_name: str, context: UserContext, session_id: str) -> None:
         if not self.is_running:
             raise RuntimeError("Runtime not started")
 
-    async def list_files(self, path: str) -> list[str]:
+    async def list_files(self, path: str, context: UserContext, session_id: str) -> list[str]:
         if not self.is_running:
             raise RuntimeError("Runtime not started")
         return list(self.files)
@@ -73,21 +80,21 @@ class IncompleteRuntime(SandboxRuntime):
 
 
 @pytest.mark.asyncio
-async def test_runtime_instantiation() -> None:
+async def test_runtime_instantiation(mock_user_context: Any) -> None:
     runtime = MockRuntime()
     assert isinstance(runtime, SandboxRuntime)
     await runtime.start()
-    result = await runtime.execute("print('hi')", "python")
+    result = await runtime.execute("print('hi')", "python", mock_user_context, "sid")
     assert result.stdout == "executed"
-    await runtime.upload(Path("local"), "remote")
+    await runtime.upload(Path("local"), "remote", mock_user_context, "sid")
     # Simulate file existing for download
     runtime.files.add("remote")
-    await runtime.download("remote", Path("local"))
+    await runtime.download("remote", Path("local"), mock_user_context, "sid")
     await runtime.terminate()
 
 
 @pytest.mark.asyncio
-async def test_complex_workflow() -> None:
+async def test_complex_workflow(mock_user_context: Any) -> None:
     """
     Simulate a full lifecycle:
     1. Start
@@ -103,11 +110,11 @@ async def test_complex_workflow() -> None:
     assert runtime.is_running
 
     # 2. Upload
-    await runtime.upload(Path("data.csv"), "/home/user/data.csv")
+    await runtime.upload(Path("data.csv"), "/home/user/data.csv", mock_user_context, "sid")
     assert "/home/user/data.csv" in runtime.files
 
     # 3. Execute
-    result = await runtime.execute("import pandas; df.plot()", "python")
+    result = await runtime.execute("import pandas; df.plot()", "python", mock_user_context, "sid")
     assert result.exit_code == 0
     assert len(result.artifacts) == 1
     assert result.artifacts[0].filename == "plot.png"
@@ -115,7 +122,7 @@ async def test_complex_workflow() -> None:
 
     # 4. Download
     # Should succeed as file exists in mock state
-    await runtime.download("/tmp/plot.png", Path("local_plot.png"))
+    await runtime.download("/tmp/plot.png", Path("local_plot.png"), mock_user_context, "sid")
 
     # 5. Terminate
     await runtime.terminate()
@@ -124,15 +131,15 @@ async def test_complex_workflow() -> None:
 
 
 @pytest.mark.asyncio
-async def test_runtime_state_enforcement() -> None:
+async def test_runtime_state_enforcement(mock_user_context: Any) -> None:
     """Ensure operations fail if runtime is not started."""
     runtime = MockRuntime()
 
     with pytest.raises(RuntimeError, match="Runtime not started"):
-        await runtime.execute("print('fail')", "python")
+        await runtime.execute("print('fail')", "python", mock_user_context, "sid")
 
     with pytest.raises(RuntimeError, match="Runtime not started"):
-        await runtime.upload(Path("x"), "y")
+        await runtime.upload(Path("x"), "y", mock_user_context, "sid")
 
 
 def test_abstract_method_enforcement() -> None:

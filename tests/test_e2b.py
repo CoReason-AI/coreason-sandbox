@@ -39,7 +39,7 @@ async def test_start_failure(mock_e2b_sandbox: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_execute_python_success(e2b_runtime: E2BRuntime) -> None:
+async def test_execute_python_success(e2b_runtime: E2BRuntime, mock_user_context: Any) -> None:
     # Mock execution result
     mock_exec = MagicMock()
     mock_exec.logs.stdout = [MagicMock(content="hello")]
@@ -50,7 +50,7 @@ async def test_execute_python_success(e2b_runtime: E2BRuntime) -> None:
     assert e2b_runtime.sandbox is not None
     e2b_runtime.sandbox.run_code.return_value = mock_exec
 
-    result = await e2b_runtime.execute("print('hello')", "python")
+    result = await e2b_runtime.execute("print('hello')", "python", mock_user_context, "sid")
 
     e2b_runtime.sandbox.run_code.assert_called_with("print('hello')")
     assert result.stdout == "hello"
@@ -58,7 +58,7 @@ async def test_execute_python_success(e2b_runtime: E2BRuntime) -> None:
 
 
 @pytest.mark.asyncio
-async def test_execute_python_error(e2b_runtime: E2BRuntime) -> None:
+async def test_execute_python_error(e2b_runtime: E2BRuntime, mock_user_context: Any) -> None:
     mock_exec = MagicMock()
     mock_exec.logs.stdout = []
     mock_exec.logs.stderr = []
@@ -68,13 +68,13 @@ async def test_execute_python_error(e2b_runtime: E2BRuntime) -> None:
     assert e2b_runtime.sandbox is not None
     e2b_runtime.sandbox.run_code.return_value = mock_exec
 
-    result = await e2b_runtime.execute("error", "python")
+    result = await e2b_runtime.execute("error", "python", mock_user_context, "sid")
     assert result.exit_code == 1
     assert "NameError" in result.stderr
 
 
 @pytest.mark.asyncio
-async def test_execute_python_artifacts(e2b_runtime: E2BRuntime) -> None:
+async def test_execute_python_artifacts(e2b_runtime: E2BRuntime, mock_user_context: Any) -> None:
     mock_exec = MagicMock()
     mock_exec.logs.stdout = []
     mock_exec.logs.stderr = []
@@ -95,7 +95,7 @@ async def test_execute_python_artifacts(e2b_runtime: E2BRuntime) -> None:
     assert e2b_runtime.sandbox is not None
     e2b_runtime.sandbox.run_code.return_value = mock_exec
 
-    result = await e2b_runtime.execute("plot()", "python")
+    result = await e2b_runtime.execute("plot()", "python", mock_user_context, "sid")
 
     assert len(result.artifacts) == 1
     assert result.artifacts[0].content_type == "image/png"
@@ -104,7 +104,7 @@ async def test_execute_python_artifacts(e2b_runtime: E2BRuntime) -> None:
 
 
 @pytest.mark.asyncio
-async def test_execute_python_filesystem_artifacts(e2b_runtime: E2BRuntime) -> None:
+async def test_execute_python_filesystem_artifacts(e2b_runtime: E2BRuntime, mock_user_context: Any) -> None:
     """Test detection of filesystem artifacts (e.g. CSV files)."""
     mock_exec = MagicMock()
     mock_exec.logs.stdout = []
@@ -129,7 +129,7 @@ async def test_execute_python_filesystem_artifacts(e2b_runtime: E2BRuntime) -> N
     # Mock download
     e2b_runtime.sandbox.files.read.return_value = b"csv_content"
 
-    result = await e2b_runtime.execute("create_csv()", "python")
+    result = await e2b_runtime.execute("create_csv()", "python", mock_user_context, "sid")
 
     assert len(result.artifacts) == 1
     assert result.artifacts[0].filename == "new.csv"
@@ -139,7 +139,7 @@ async def test_execute_python_filesystem_artifacts(e2b_runtime: E2BRuntime) -> N
 
 
 @pytest.mark.asyncio
-async def test_execute_bash_success(e2b_runtime: E2BRuntime) -> None:
+async def test_execute_bash_success(e2b_runtime: E2BRuntime, mock_user_context: Any) -> None:
     mock_cmd = MagicMock()
     mock_cmd.stdout = "root"
     mock_cmd.stderr = ""
@@ -147,14 +147,14 @@ async def test_execute_bash_success(e2b_runtime: E2BRuntime) -> None:
     assert e2b_runtime.sandbox is not None
     e2b_runtime.sandbox.commands.run.return_value = mock_cmd
 
-    result = await e2b_runtime.execute("whoami", "bash")
+    result = await e2b_runtime.execute("whoami", "bash", mock_user_context, "sid")
 
     e2b_runtime.sandbox.commands.run.assert_called_with("whoami")
     assert result.stdout == "root"
 
 
 @pytest.mark.asyncio
-async def test_execute_r_success(e2b_runtime: E2BRuntime) -> None:
+async def test_execute_r_success(e2b_runtime: E2BRuntime, mock_user_context: Any) -> None:
     mock_cmd = MagicMock()
     mock_cmd.stdout = "[1] 4"
     mock_cmd.stderr = ""
@@ -162,106 +162,106 @@ async def test_execute_r_success(e2b_runtime: E2BRuntime) -> None:
     assert e2b_runtime.sandbox is not None
     e2b_runtime.sandbox.commands.run.return_value = mock_cmd
 
-    result = await e2b_runtime.execute("2+2", "r")
+    result = await e2b_runtime.execute("2+2", "r", mock_user_context, "sid")
 
     e2b_runtime.sandbox.commands.run.assert_called_with("Rscript -e '2+2'")
     assert result.stdout == "[1] 4"
 
 
 @pytest.mark.asyncio
-async def test_execute_unsupported(e2b_runtime: E2BRuntime) -> None:
+async def test_execute_unsupported(e2b_runtime: E2BRuntime, mock_user_context: Any) -> None:
     with pytest.raises(ValueError):
-        await e2b_runtime.execute("code", "java")  # type: ignore
+        await e2b_runtime.execute("code", "java", mock_user_context, "sid")  # type: ignore
 
 
 @pytest.mark.asyncio
-async def test_execute_exception(e2b_runtime: E2BRuntime) -> None:
+async def test_execute_exception(e2b_runtime: E2BRuntime, mock_user_context: Any) -> None:
     assert e2b_runtime.sandbox is not None
     e2b_runtime.sandbox.run_code.side_effect = Exception("Fail")
     with pytest.raises(Exception, match="Fail"):
-        await e2b_runtime.execute("code", "python")
+        await e2b_runtime.execute("code", "python", mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_execute_no_sandbox(mock_e2b_sandbox: Any) -> None:
+async def test_execute_no_sandbox(mock_e2b_sandbox: Any, mock_user_context: Any) -> None:
     runtime = E2BRuntime()
     with pytest.raises(RuntimeError):
-        await runtime.execute("code", "python")
+        await runtime.execute("code", "python", mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_upload_success(e2b_runtime: E2BRuntime, tmp_path: Any) -> None:
+async def test_upload_success(e2b_runtime: E2BRuntime, tmp_path: Any, mock_user_context: Any) -> None:
     local_file = tmp_path / "test.txt"
     local_file.write_text("content")
 
-    await e2b_runtime.upload(local_file, "remote.txt")
+    await e2b_runtime.upload(local_file, "remote.txt", mock_user_context, "sid")
 
     assert e2b_runtime.sandbox is not None
     e2b_runtime.sandbox.files.write.assert_called()
 
 
 @pytest.mark.asyncio
-async def test_upload_no_file(e2b_runtime: E2BRuntime, tmp_path: Any) -> None:
+async def test_upload_no_file(e2b_runtime: E2BRuntime, tmp_path: Any, mock_user_context: Any) -> None:
     local_file = tmp_path / "missing.txt"
     with pytest.raises(FileNotFoundError):
-        await e2b_runtime.upload(local_file, "remote.txt")
+        await e2b_runtime.upload(local_file, "remote.txt", mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_upload_exception(e2b_runtime: E2BRuntime, tmp_path: Any) -> None:
+async def test_upload_exception(e2b_runtime: E2BRuntime, tmp_path: Any, mock_user_context: Any) -> None:
     local_file = tmp_path / "test.txt"
     local_file.write_text("content")
     assert e2b_runtime.sandbox is not None
     e2b_runtime.sandbox.files.write.side_effect = Exception("Fail")
 
     with pytest.raises(Exception, match="Fail"):
-        await e2b_runtime.upload(local_file, "remote.txt")
+        await e2b_runtime.upload(local_file, "remote.txt", mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_upload_no_sandbox(tmp_path: Any) -> None:
+async def test_upload_no_sandbox(tmp_path: Any, mock_user_context: Any) -> None:
     runtime = E2BRuntime()
     local_file = tmp_path / "test.txt"
     with pytest.raises(RuntimeError):
-        await runtime.upload(local_file, "remote.txt")
+        await runtime.upload(local_file, "remote.txt", mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_download_success(e2b_runtime: E2BRuntime, tmp_path: Any) -> None:
+async def test_download_success(e2b_runtime: E2BRuntime, tmp_path: Any, mock_user_context: Any) -> None:
     assert e2b_runtime.sandbox is not None
     e2b_runtime.sandbox.files.read.return_value = b"content"
 
     dest = tmp_path / "downloaded.txt"
-    await e2b_runtime.download("remote.txt", dest)
+    await e2b_runtime.download("remote.txt", dest, mock_user_context, "sid")
 
     assert dest.read_text() == "content"
 
 
 @pytest.mark.asyncio
-async def test_download_not_found(e2b_runtime: E2BRuntime, tmp_path: Any) -> None:
+async def test_download_not_found(e2b_runtime: E2BRuntime, tmp_path: Any, mock_user_context: Any) -> None:
     assert e2b_runtime.sandbox is not None
     e2b_runtime.sandbox.files.read.return_value = None
 
     dest = tmp_path / "downloaded.txt"
     with pytest.raises(FileNotFoundError):
-        await e2b_runtime.download("missing.txt", dest)
+        await e2b_runtime.download("missing.txt", dest, mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_download_exception(e2b_runtime: E2BRuntime, tmp_path: Any) -> None:
+async def test_download_exception(e2b_runtime: E2BRuntime, tmp_path: Any, mock_user_context: Any) -> None:
     assert e2b_runtime.sandbox is not None
     e2b_runtime.sandbox.files.read.side_effect = Exception("Fail")
     dest = tmp_path / "downloaded.txt"
     with pytest.raises(Exception, match="Fail"):
-        await e2b_runtime.download("remote.txt", dest)
+        await e2b_runtime.download("remote.txt", dest, mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_download_no_sandbox(tmp_path: Any) -> None:
+async def test_download_no_sandbox(tmp_path: Any, mock_user_context: Any) -> None:
     runtime = E2BRuntime()
     dest = tmp_path / "dest.txt"
     with pytest.raises(RuntimeError):
-        await runtime.download("remote.txt", dest)
+        await runtime.download("remote.txt", dest, mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
@@ -294,65 +294,65 @@ async def test_terminate_no_sandbox() -> None:
 
 
 @pytest.mark.asyncio
-async def test_install_package_success(e2b_runtime: E2BRuntime) -> None:
+async def test_install_package_success(e2b_runtime: E2BRuntime, mock_user_context: Any) -> None:
     assert e2b_runtime.sandbox is not None
-    await e2b_runtime.install_package("requests")
+    await e2b_runtime.install_package("requests", mock_user_context, "sid")
     e2b_runtime.sandbox.commands.run.assert_called_with("pip install requests")
 
 
 @pytest.mark.asyncio
-async def test_install_package_exception(e2b_runtime: E2BRuntime) -> None:
+async def test_install_package_exception(e2b_runtime: E2BRuntime, mock_user_context: Any) -> None:
     assert e2b_runtime.sandbox is not None
     e2b_runtime.sandbox.commands.run.side_effect = Exception("Fail")
     with pytest.raises(Exception, match="Fail"):
-        await e2b_runtime.install_package("requests")
+        await e2b_runtime.install_package("requests", mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_install_package_no_sandbox() -> None:
+async def test_install_package_no_sandbox(mock_user_context: Any) -> None:
     runtime = E2BRuntime()
     with pytest.raises(RuntimeError):
-        await runtime.install_package("req")
+        await runtime.install_package("req", mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_list_files_success(e2b_runtime: E2BRuntime) -> None:
+async def test_list_files_success(e2b_runtime: E2BRuntime, mock_user_context: Any) -> None:
     assert e2b_runtime.sandbox is not None
     entry = MagicMock()
     entry.name = "file.txt"
     e2b_runtime.sandbox.files.list.return_value = [entry]
 
-    files = await e2b_runtime.list_files(".")
+    files = await e2b_runtime.list_files(".", mock_user_context, "sid")
     assert files == ["file.txt"]
 
 
 @pytest.mark.asyncio
-async def test_list_files_exception(e2b_runtime: E2BRuntime) -> None:
+async def test_list_files_exception(e2b_runtime: E2BRuntime, mock_user_context: Any) -> None:
     assert e2b_runtime.sandbox is not None
     e2b_runtime.sandbox.files.list.side_effect = Exception("Fail")
 
-    files = await e2b_runtime.list_files(".")
+    files = await e2b_runtime.list_files(".", mock_user_context, "sid")
     assert files == []
 
 
 @pytest.mark.asyncio
-async def test_list_files_internal_exception(e2b_runtime: E2BRuntime) -> None:
+async def test_list_files_internal_exception(e2b_runtime: E2BRuntime, mock_user_context: Any) -> None:
     assert e2b_runtime.sandbox is not None
     e2b_runtime.sandbox.files.list.side_effect = Exception("Fail")
 
-    files = await e2b_runtime._list_files_internal(".")
+    files = await e2b_runtime._list_files_internal(".", mock_user_context, "sid")
     assert files == set()
 
 
 @pytest.mark.asyncio
-async def test_list_files_internal_no_sandbox() -> None:
+async def test_list_files_internal_no_sandbox(mock_user_context: Any) -> None:
     runtime = E2BRuntime()
-    files = await runtime._list_files_internal(".")
+    files = await runtime._list_files_internal(".", mock_user_context, "sid")
     assert files == set()
 
 
 @pytest.mark.asyncio
-async def test_execute_python_artifact_retrieval_exception(e2b_runtime: E2BRuntime) -> None:
+async def test_execute_python_artifact_retrieval_exception(e2b_runtime: E2BRuntime, mock_user_context: Any) -> None:
     mock_exec = MagicMock()
     mock_exec.logs.stdout = []
     mock_exec.logs.stderr = []
@@ -371,21 +371,21 @@ async def test_execute_python_artifact_retrieval_exception(e2b_runtime: E2BRunti
 
     e2b_runtime.sandbox.files.read.side_effect = Exception("Download Fail")
 
-    result = await e2b_runtime.execute("create()", "python")
+    result = await e2b_runtime.execute("create()", "python", mock_user_context, "sid")
 
     assert len(result.artifacts) == 0
     assert result.exit_code == 0
 
 
 @pytest.mark.asyncio
-async def test_list_files_no_sandbox() -> None:
+async def test_list_files_no_sandbox(mock_user_context: Any) -> None:
     runtime = E2BRuntime()
     with pytest.raises(RuntimeError):
-        await runtime.list_files(".")
+        await runtime.list_files(".", mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_execute_python_multiple_artifacts_with_spaces(e2b_runtime: E2BRuntime) -> None:
+async def test_execute_python_multiple_artifacts_with_spaces(e2b_runtime: E2BRuntime, mock_user_context: Any) -> None:
     mock_exec = MagicMock()
     mock_exec.logs.stdout = []
     mock_exec.logs.stderr = []
@@ -418,7 +418,7 @@ async def test_execute_python_multiple_artifacts_with_spaces(e2b_runtime: E2BRun
 
     e2b_runtime.sandbox.files.read.side_effect = side_effect_read
 
-    result = await e2b_runtime.execute("create_multiple()", "python")
+    result = await e2b_runtime.execute("create_multiple()", "python", mock_user_context, "sid")
 
     assert len(result.artifacts) == 3
     filenames = {a.filename for a in result.artifacts}
@@ -426,7 +426,7 @@ async def test_execute_python_multiple_artifacts_with_spaces(e2b_runtime: E2BRun
 
 
 @pytest.mark.asyncio
-async def test_execute_file_deletion_and_modification(e2b_runtime: E2BRuntime) -> None:
+async def test_execute_file_deletion_and_modification(e2b_runtime: E2BRuntime, mock_user_context: Any) -> None:
     mock_exec = MagicMock()
     mock_exec.logs.stdout = []
     mock_exec.logs.stderr = []
@@ -448,13 +448,13 @@ async def test_execute_file_deletion_and_modification(e2b_runtime: E2BRuntime) -
 
     e2b_runtime.sandbox.files.read.return_value = b"content"
 
-    result = await e2b_runtime.execute("delete_and_modify()", "python")
+    result = await e2b_runtime.execute("delete_and_modify()", "python", mock_user_context, "sid")
 
     assert len(result.artifacts) == 0
 
 
 @pytest.mark.asyncio
-async def test_execute_python_timeout(e2b_runtime: E2BRuntime) -> None:
+async def test_execute_python_timeout(e2b_runtime: E2BRuntime, mock_user_context: Any) -> None:
     """Test that execution enforces timeout."""
     e2b_runtime.timeout = 0.1
 
@@ -466,11 +466,11 @@ async def test_execute_python_timeout(e2b_runtime: E2BRuntime) -> None:
     e2b_runtime.sandbox.run_code.side_effect = long_running_code
 
     with pytest.raises(TimeoutError, match="Execution exceeded 0.1 seconds limit"):
-        await e2b_runtime.execute("while True: pass", "python")
+        await e2b_runtime.execute("while True: pass", "python", mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_execute_bash_timeout(e2b_runtime: E2BRuntime) -> None:
+async def test_execute_bash_timeout(e2b_runtime: E2BRuntime, mock_user_context: Any) -> None:
     """Test that bash execution enforces timeout."""
     e2b_runtime.timeout = 0.1
 
@@ -482,11 +482,11 @@ async def test_execute_bash_timeout(e2b_runtime: E2BRuntime) -> None:
     e2b_runtime.sandbox.commands.run.side_effect = long_running_code
 
     with pytest.raises(TimeoutError, match="Execution exceeded 0.1 seconds limit"):
-        await e2b_runtime.execute("sleep 10", "bash")
+        await e2b_runtime.execute("sleep 10", "bash", mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
-async def test_execute_r_timeout(e2b_runtime: E2BRuntime) -> None:
+async def test_execute_r_timeout(e2b_runtime: E2BRuntime, mock_user_context: Any) -> None:
     """Test that R execution enforces timeout."""
     e2b_runtime.timeout = 0.1
 
@@ -498,7 +498,7 @@ async def test_execute_r_timeout(e2b_runtime: E2BRuntime) -> None:
     e2b_runtime.sandbox.commands.run.side_effect = long_running_code
 
     with pytest.raises(TimeoutError, match="Execution exceeded 0.1 seconds limit"):
-        await e2b_runtime.execute("Sys.sleep(10)", "r")
+        await e2b_runtime.execute("Sys.sleep(10)", "r", mock_user_context, "sid")
 
 
 @pytest.mark.asyncio
@@ -527,7 +527,7 @@ async def test_start_idempotency_with_restart(e2b_runtime: E2BRuntime) -> None:
 
 
 @pytest.mark.asyncio
-async def test_execute_sequential_persistence(e2b_runtime: E2BRuntime) -> None:
+async def test_execute_sequential_persistence(e2b_runtime: E2BRuntime, mock_user_context: Any) -> None:
     """Verify multiple execute calls use the same sandbox instance."""
     assert e2b_runtime.sandbox is not None
     original_sandbox = e2b_runtime.sandbox
@@ -549,11 +549,11 @@ async def test_execute_sequential_persistence(e2b_runtime: E2BRuntime) -> None:
     e2b_runtime.sandbox.run_code.side_effect = [mock_exec1, mock_exec2]
 
     # Run 1
-    res1 = await e2b_runtime.execute("x=1", "python")
+    res1 = await e2b_runtime.execute("x=1", "python", mock_user_context, "sid")
     assert res1.stdout == "step1"
 
     # Run 2
-    res2 = await e2b_runtime.execute("print(x)", "python")
+    res2 = await e2b_runtime.execute("print(x)", "python", mock_user_context, "sid")
     assert res2.stdout == "step2"
 
     # Verify sandbox instance didn't change
@@ -563,7 +563,7 @@ async def test_execute_sequential_persistence(e2b_runtime: E2BRuntime) -> None:
 
 
 @pytest.mark.asyncio
-async def test_execute_error_persistence(e2b_runtime: E2BRuntime) -> None:
+async def test_execute_error_persistence(e2b_runtime: E2BRuntime, mock_user_context: Any) -> None:
     """Verify non-fatal error doesn't restart sandbox."""
     assert e2b_runtime.sandbox is not None
     original_sandbox = e2b_runtime.sandbox
@@ -585,11 +585,11 @@ async def test_execute_error_persistence(e2b_runtime: E2BRuntime) -> None:
     e2b_runtime.sandbox.run_code.side_effect = [mock_exec_err, mock_exec_ok]
 
     # Run 1 (Error)
-    res1 = await e2b_runtime.execute("syntax error", "python")
+    res1 = await e2b_runtime.execute("syntax error", "python", mock_user_context, "sid")
     assert res1.exit_code == 1
 
     # Run 2 (OK)
-    res2 = await e2b_runtime.execute("print('ok')", "python")
+    res2 = await e2b_runtime.execute("print('ok')", "python", mock_user_context, "sid")
     assert res2.exit_code == 0
 
     # Verify sandbox instance preserved
@@ -597,7 +597,7 @@ async def test_execute_error_persistence(e2b_runtime: E2BRuntime) -> None:
 
 
 @pytest.mark.asyncio
-async def test_concurrent_terminate_during_execute(e2b_runtime: E2BRuntime) -> None:
+async def test_concurrent_terminate_during_execute(e2b_runtime: E2BRuntime, mock_user_context: Any) -> None:
     """Simulate terminate being called while execute is waiting."""
     assert e2b_runtime.sandbox is not None
 
@@ -608,7 +608,7 @@ async def test_concurrent_terminate_during_execute(e2b_runtime: E2BRuntime) -> N
     e2b_runtime.sandbox.run_code.side_effect = side_effect
 
     # Start execute task
-    exec_task = asyncio.create_task(e2b_runtime.execute("sleep", "python"))
+    exec_task = asyncio.create_task(e2b_runtime.execute("sleep", "python", mock_user_context, "sid"))
 
     # Wait a bit then terminate
     await asyncio.sleep(0.05)
