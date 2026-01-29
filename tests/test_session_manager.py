@@ -13,9 +13,9 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from coreason_identity.models import UserContext
 from coreason_sandbox.config import SandboxConfig
 from coreason_sandbox.session_manager import SessionManager
+from coreason_identity.models import UserContext
 
 
 @pytest.fixture
@@ -91,6 +91,79 @@ async def test_session_access_denied(mock_factory: Any, mock_runtime: Any, mock_
 
     with pytest.raises(PermissionError, match="Session belongs to another user"):
         await manager.get_or_create_session(session_id, other_context)
+
+
+@pytest.mark.asyncio
+async def test_session_creation_race_condition_access_denied(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
+    """
+    Test race condition where two users try to create the same session ID.
+    User 1 gets the lock and creates it.
+    User 2 waits for lock, then sees it created but with wrong owner.
+    """
+    manager = SessionManager()
+    session_id = "race_session"
+
+    # Define User 2 context
+    user2_context = UserContext(
+        sub="user2",
+        email="user2@example.com",
+        permissions=[],
+    )
+
+    # Mock runtime.start to sleep slightly, ensuring User 2 enters get_or_create_session
+    # and waits on the lock while User 1 is still "starting" the runtime inside the lock.
+    async def slow_start() -> None:
+        await asyncio.sleep(0.1)
+
+    mock_runtime.start.side_effect = slow_start
+
+    # Start both tasks roughly at same time
+    task1 = asyncio.create_task(manager.get_or_create_session(session_id, mock_user_context))
+
+    # Slight delay to ensure task1 enters first and grabs lock
+    await asyncio.sleep(0.01)
+
+    task2 = asyncio.create_task(manager.get_or_create_session(session_id, user2_context))
+
+    # Wait for results
+    await task1
+
+    # Task 2 should raise PermissionError
+    with pytest.raises(PermissionError, match="Session belongs to another user"):
+        await task2
+
+
+@pytest.mark.asyncio
+async def test_session_creation_race_condition_access_allowed(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
+    """
+    Test race condition where two requests with SAME user try to create session.
+    User 1 creates. User 2 waits for lock, then sees it created and succeeds.
+    """
+    manager = SessionManager()
+    session_id = "race_session_ok"
+
+    # Mock runtime.start to sleep slightly
+    async def slow_start() -> None:
+        await asyncio.sleep(0.1)
+
+    mock_runtime.start.side_effect = slow_start
+
+    # Start both tasks roughly at same time
+    task1 = asyncio.create_task(manager.get_or_create_session(session_id, mock_user_context))
+
+    # Slight delay to ensure task1 enters first and grabs lock
+    await asyncio.sleep(0.01)
+
+    # Same user context
+    task2 = asyncio.create_task(manager.get_or_create_session(session_id, mock_user_context))
+
+    # Wait for results
+    session1 = await task1
+    session2 = await task2
+
+    assert session1 is session2
+    assert session1.owner_id == "test-user"
+    mock_runtime.start.assert_called_once()
 
 
 @pytest.mark.asyncio
