@@ -38,7 +38,7 @@ async def lifespan(server: FastMCP) -> AsyncIterator[None]:
 mcp = FastMCP("coreason-sandbox", lifespan=lifespan)
 
 
-@mcp.tool()  # type: ignore
+@mcp.tool()
 async def execute_code(
     session_id: str, language: Literal["python", "bash", "r"], code: str
 ) -> list[TextContent | ImageContent]:
@@ -133,7 +133,7 @@ async def execute_code(
     return output
 
 
-@mcp.tool()  # type: ignore
+@mcp.tool()
 async def install_package(session_id: str, package_name: str) -> str:
     """Install a package in the sandbox session.
 
@@ -156,7 +156,7 @@ async def install_package(session_id: str, package_name: str) -> str:
         return f"Error installing package: {e!s}"
 
 
-@mcp.tool()  # type: ignore
+@mcp.tool()
 async def list_files(session_id: str, path: str = ".") -> list[str]:
     """List files in the sandbox session directory.
 

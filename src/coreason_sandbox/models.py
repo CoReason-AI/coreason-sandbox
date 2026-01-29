@@ -11,7 +11,7 @@
 from pydantic import BaseModel
 
 
-class FileReference(BaseModel):
+class FileReference(BaseModel):  # type: ignore[misc]
     """Represents a file artifact generated or manipulated within the sandbox.
 
     Attributes:
@@ -29,7 +29,7 @@ class FileReference(BaseModel):
     url: str | None = None
 
 
-class ExecutionResult(BaseModel):
+class ExecutionResult(BaseModel):  # type: ignore[misc]
     """Represents the result of a code execution within the sandbox.
 
     Attributes:
