@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Protocol
 
 import aiofiles
+from coreason_identity.models import UserContext
 
 from coreason_sandbox.models import FileReference
 
@@ -11,12 +12,14 @@ from coreason_sandbox.models import FileReference
 class ObjectStorage(Protocol):
     """Protocol for object storage backends (e.g., S3)."""
 
-    async def upload_file(self, file_path: Path, object_name: str) -> str:
+    async def upload_file(self, file_path: Path, object_name: str, context: UserContext, session_id: str) -> str:
         """Uploads a file to object storage and returns an access URL.
 
         Args:
             file_path: The local path to the file.
             object_name: The destination object key.
+            context: The user context.
+            session_id: The session ID.
 
         Returns:
             str: The URL to access the uploaded file.
@@ -35,7 +38,9 @@ class ArtifactManager:
         """
         self.storage = storage
 
-    async def process_file(self, file_path: Path, original_filename: str) -> FileReference:
+    async def process_file(
+        self, file_path: Path, original_filename: str, context: UserContext, session_id: str
+    ) -> FileReference:
         """Process a local file (downloaded from sandbox) and return a FileReference.
 
         Converts images to Base64 data URIs.
@@ -44,6 +49,8 @@ class ArtifactManager:
         Args:
             file_path: The local path to the artifact file.
             original_filename: The original filename in the sandbox.
+            context: The user context.
+            session_id: The session ID.
 
         Returns:
             FileReference: A reference object containing metadata and access URL.
@@ -75,7 +82,7 @@ class ArtifactManager:
         # Document/Other processing
         elif self.storage:
             try:
-                url = await self.storage.upload_file(file_path, original_filename)
+                url = await self.storage.upload_file(file_path, original_filename, context, session_id)
                 file_ref.url = url
             except Exception:  # pragma: no cover
                 # Fallback or log error? For now, leave URL empty if upload fails

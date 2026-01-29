@@ -59,12 +59,12 @@ async def test_reaper_cancellation_coverage(mock_factory: Any, mock_runtime: Any
 
 
 @pytest.mark.asyncio
-async def test_shutdown_terminate_exception(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_shutdown_terminate_exception(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     """Test that shutdown handles exceptions during runtime termination (lines 170-171)."""
     mcp = SandboxMCP()
 
     # Create a session
-    await mcp.session_manager.get_or_create_session("sess_fail")
+    await mcp.session_manager.get_or_create_session("sess_fail", mock_user_context)
     assert "sess_fail" in mcp.sessions
 
     # Mock terminate to raise exception

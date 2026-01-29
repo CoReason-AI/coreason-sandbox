@@ -31,7 +31,9 @@ def mock_veritas() -> Any:
 
 
 @pytest.mark.asyncio
-async def test_mcp_execute_code(mock_factory: Any, mock_runtime: Any, mock_veritas: Any) -> None:
+async def test_mcp_execute_code(
+    mock_factory: Any, mock_runtime: Any, mock_veritas: Any, mock_user_context: Any
+) -> None:
     mcp = SandboxMCP()
     session_id = "test_session"
 
@@ -43,7 +45,7 @@ async def test_mcp_execute_code(mock_factory: Any, mock_runtime: Any, mock_verit
         execution_duration=1.0,
     )
 
-    result = await mcp.execute_code(session_id, "python", "print('hi')")
+    result = await mcp.execute_code(session_id, "python", "print('hi')", mock_user_context)
 
     # Verify auto-start
     mock_runtime.start.assert_called_once()
@@ -53,7 +55,7 @@ async def test_mcp_execute_code(mock_factory: Any, mock_runtime: Any, mock_verit
     mock_veritas.return_value.log_pre_execution.assert_called_with("print('hi')", "python")
 
     # Verify Execution
-    mock_runtime.execute.assert_called_with("print('hi')", "python")
+    mock_runtime.execute.assert_called_with("print('hi')", "python", mock_user_context, session_id)
 
     # Verify output format
     assert result["stdout"] == "out"
@@ -63,39 +65,39 @@ async def test_mcp_execute_code(mock_factory: Any, mock_runtime: Any, mock_verit
 
 
 @pytest.mark.asyncio
-async def test_mcp_install_package(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_mcp_install_package(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     mcp = SandboxMCP()
     session_id = "test_session"
 
-    resp = await mcp.install_package(session_id, "requests")
+    resp = await mcp.install_package(session_id, "requests", mock_user_context)
 
     mock_runtime.start.assert_called_once()
-    mock_runtime.install_package.assert_called_with("requests")
+    mock_runtime.install_package.assert_called_with("requests", mock_user_context, session_id)
     assert "installed successfully" in resp
     assert session_id in mcp.sessions
 
 
 @pytest.mark.asyncio
-async def test_mcp_list_files(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_mcp_list_files(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     mcp = SandboxMCP()
     session_id = "test_session"
     mock_runtime.list_files.return_value = ["file1", "file2"]
 
-    files = await mcp.list_files(session_id, "/home")
+    files = await mcp.list_files(session_id, mock_user_context, "/home")
 
     mock_runtime.start.assert_called_once()
-    mock_runtime.list_files.assert_called_with("/home")
+    mock_runtime.list_files.assert_called_with("/home", mock_user_context, session_id)
     assert files == ["file1", "file2"]
     assert session_id in mcp.sessions
 
 
 @pytest.mark.asyncio
-async def test_mcp_shutdown(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_mcp_shutdown(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     mcp = SandboxMCP()
     session_id = "test_session"
 
     # Initialize a session
-    await mcp.execute_code(session_id, "python", "pass")
+    await mcp.execute_code(session_id, "python", "pass", mock_user_context)
     assert session_id in mcp.sessions
 
     await mcp.shutdown()

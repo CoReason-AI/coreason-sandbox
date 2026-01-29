@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "coreason_sandbox"
-version = "0.1.0"
+version = "0.2.0"
 description = "coreason-sandbox"
 authors = ["Gowtham A Rao <gowtham.rao@coreason.ai>"]
 license = "Prosperity-3.0"
@@ -12,14 +12,15 @@ python = ">=3.12, <3.15"
 loguru = "^0.7.2"
 pydantic = "^2.12.5"
 pydantic-settings = "^2.12.0"
-anyio = "^4.4.0"
-httpx = "^0.27.0"
+anyio = "^4.12.1"
+httpx = "^0.28.1"
 aiofiles = "^23.2.1"
 docker = "^7.1.0"
 e2b-code-interpreter = "^2.4.1"
 boto3 = "^1.42.33"
 mcp = "^1.25.0"
 packaging = "^26.0"
+coreason-identity = "^0.1.0"
 
 [tool.poetry.scripts]
 coreason-sandbox = "coreason_sandbox.main:main"
@@ -43,7 +44,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "coreason_sandbox"
-version = "0.1.0"
+version = "0.2.0"
 description = "coreason-sandbox"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -74,6 +75,7 @@ ignore = []
 python_version = "3.12"
 strict = true
 ignore_missing_imports = true
+disallow_untyped_decorators = false
 
 [tool.pytest.ini_options]
 addopts = "--cov=src --cov-report=term-missing --cov-report=html --cov-fail-under=100"

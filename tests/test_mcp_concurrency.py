@@ -37,7 +37,7 @@ def mock_factory(mock_runtime: Any) -> Any:
 
 
 @pytest.mark.asyncio
-async def test_concurrent_session_creation(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_concurrent_session_creation(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     """Verify concurrent creation creates only one runtime."""
     mcp = SandboxMCP()
     session_id = "concurrent_create"
@@ -48,8 +48,8 @@ async def test_concurrent_session_creation(mock_factory: Any, mock_runtime: Any)
     mock_runtime.start.side_effect = slow_start
 
     # Access session_manager directly
-    t1 = asyncio.create_task(mcp.session_manager.get_or_create_session(session_id))
-    t2 = asyncio.create_task(mcp.session_manager.get_or_create_session(session_id))
+    t1 = asyncio.create_task(mcp.session_manager.get_or_create_session(session_id, mock_user_context))
+    t2 = asyncio.create_task(mcp.session_manager.get_or_create_session(session_id, mock_user_context))
 
     s1, s2 = await asyncio.gather(t1, t2)
 
@@ -61,10 +61,15 @@ async def test_concurrent_session_creation(mock_factory: Any, mock_runtime: Any)
 
 
 async def _run_race_test(
-    mcp: SandboxMCP, session_id: str, coro_func: Any, mock_runtime: Any, success_check: Any
+    mcp: SandboxMCP,
+    session_id: str,
+    coro_func: Any,
+    mock_runtime: Any,
+    success_check: Any,
+    mock_user_context: Any,
 ) -> None:
     """Helper to run the race condition test pattern."""
-    session1 = await mcp.session_manager.get_or_create_session(session_id)
+    session1 = await mcp.session_manager.get_or_create_session(session_id, mock_user_context)
     await session1.lock.acquire()
 
     # Simulate session 1 poisoned
@@ -79,7 +84,7 @@ async def _run_race_test(
     )
     mock_runtime2.list_files.return_value = ["retry_file"]
 
-    session2 = Session(runtime=mock_runtime2, last_accessed=0)
+    session2 = Session(runtime=mock_runtime2, last_accessed=0, owner_id=mock_user_context.sub)
 
     # Patch the method on the session_manager instance
     with patch.object(mcp.session_manager, "get_or_create_session", side_effect=[session1, session2]):
@@ -92,7 +97,7 @@ async def _run_race_test(
 
 
 @pytest.mark.asyncio
-async def test_execution_during_reaping_race(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_execution_during_reaping_race(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     mcp = SandboxMCP()
 
     def check(result: Any, r1: Any, r2: Any) -> None:
@@ -100,12 +105,21 @@ async def test_execution_during_reaping_race(mock_factory: Any, mock_runtime: An
         r1.execute.assert_not_called()
         r2.execute.assert_called_once()
 
-    await _run_race_test(mcp, "race_exec", lambda: mcp.execute_code("race_exec", "python", "pass"), mock_runtime, check)
+    await _run_race_test(
+        mcp,
+        "race_exec",
+        lambda: mcp.execute_code("race_exec", "python", "pass", mock_user_context),
+        mock_runtime,
+        check,
+        mock_user_context,
+    )
     await mcp.shutdown()
 
 
 @pytest.mark.asyncio
-async def test_install_package_during_reaping_race(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_install_package_during_reaping_race(
+    mock_factory: Any, mock_runtime: Any, mock_user_context: Any
+) -> None:
     mcp = SandboxMCP()
 
     def check(result: Any, r1: Any, r2: Any) -> None:
@@ -113,12 +127,19 @@ async def test_install_package_during_reaping_race(mock_factory: Any, mock_runti
         r1.install_package.assert_not_called()
         r2.install_package.assert_called_once()
 
-    await _run_race_test(mcp, "race_install", lambda: mcp.install_package("race_install", "pkg"), mock_runtime, check)
+    await _run_race_test(
+        mcp,
+        "race_install",
+        lambda: mcp.install_package("race_install", "pkg", mock_user_context),
+        mock_runtime,
+        check,
+        mock_user_context,
+    )
     await mcp.shutdown()
 
 
 @pytest.mark.asyncio
-async def test_list_files_during_reaping_race(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_list_files_during_reaping_race(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     mcp = SandboxMCP()
 
     def check(result: Any, r1: Any, r2: Any) -> None:
@@ -126,12 +147,19 @@ async def test_list_files_during_reaping_race(mock_factory: Any, mock_runtime: A
         r1.list_files.assert_not_called()
         r2.list_files.assert_called_once()
 
-    await _run_race_test(mcp, "race_ls", lambda: mcp.list_files("race_ls", "."), mock_runtime, check)
+    await _run_race_test(
+        mcp,
+        "race_ls",
+        lambda: mcp.list_files("race_ls", mock_user_context, "."),
+        mock_runtime,
+        check,
+        mock_user_context,
+    )
     await mcp.shutdown()
 
 
 @pytest.mark.asyncio
-async def test_thundering_herd_on_dying_session(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_thundering_herd_on_dying_session(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     """
     Simulate multiple concurrent requests accessing a session that is being reaped.
     All should eventually succeed with a valid (new) session.
@@ -140,7 +168,7 @@ async def test_thundering_herd_on_dying_session(mock_factory: Any, mock_runtime:
     session_id = "thundering_herd"
 
     # 1. Setup initial session
-    session1 = await mcp.session_manager.get_or_create_session(session_id)
+    session1 = await mcp.session_manager.get_or_create_session(session_id, mock_user_context)
 
     # Simulate session1 is being reaped (active=False) but lock held by reaper (simulated by us acquiring it)
     await session1.lock.acquire()
@@ -152,30 +180,17 @@ async def test_thundering_herd_on_dying_session(mock_factory: Any, mock_runtime:
     mock_runtime2.execute.return_value = ExecutionResult(
         stdout="herd_success", stderr="", exit_code=0, artifacts=[], execution_duration=0.1
     )
-    session2 = Session(runtime=mock_runtime2, last_accessed=0)
+    session2 = Session(runtime=mock_runtime2, last_accessed=0, owner_id=mock_user_context.sub)
 
     # 3. Patch get_or_create_session to return session1 (doomed) first for ALL concurrent calls,
     #    then session2 for the retry.
     #    Since multiple calls will retry, we need session2 to be returned multiple times or cached.
     #    Ideally, the first retry creates session2, subsequent retries get session2.
 
-    async def side_effect(sid: str) -> Session:
-        if sid == session_id and not session1.lock.locked():
-            # If lock is released, we assume we are in the "retry" phase where session1 is gone.
-            # However, in our simulation, we manually release lock.
-            return session2
-        return session1
-
-    # A slightly more robust side_effect for the sequence:
-    # We want:
-    #  - Call 1..N: return session1
-    #  - Call N+1..M: return session2
-    # But side_effect is called inside execute_code loop.
-
     call_count = 0
     num_requests = 5
 
-    async def dynamic_side_effect(sid: str) -> Session:
+    async def dynamic_side_effect(sid: str, ctx: Any) -> Session:
         nonlocal call_count
         call_count += 1
         # The first 'num_requests' calls get the doomed session
@@ -185,7 +200,10 @@ async def test_thundering_herd_on_dying_session(mock_factory: Any, mock_runtime:
 
     with patch.object(mcp.session_manager, "get_or_create_session", side_effect=dynamic_side_effect):
         # Launch concurrent requests
-        tasks = [asyncio.create_task(mcp.execute_code(session_id, "python", "pass")) for _ in range(num_requests)]
+        tasks = [
+            asyncio.create_task(mcp.execute_code(session_id, "python", "pass", mock_user_context))
+            for _ in range(num_requests)
+        ]
 
         # Allow them to hit the lock
         await asyncio.sleep(0.01)

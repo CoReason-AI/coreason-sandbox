@@ -31,27 +31,29 @@ def mock_veritas() -> Any:
 
 
 @pytest.mark.asyncio
-async def test_mcp_validation_none_session_id() -> None:
+async def test_mcp_validation_none_session_id(mock_user_context: Any) -> None:
     mcp = SandboxMCP()
     # Type ignore because we are intentionally passing None to test runtime safety
     with pytest.raises(ValueError, match="Session ID is required"):
-        await mcp.execute_code(None, "python", "print(1)")  # type: ignore
+        await mcp.execute_code(None, "python", "print(1)", mock_user_context)  # type: ignore
 
     with pytest.raises(ValueError, match="Session ID is required"):
-        await mcp.install_package(None, "pandas")  # type: ignore
+        await mcp.install_package(None, "pandas", mock_user_context)  # type: ignore
 
     with pytest.raises(ValueError, match="Session ID is required"):
-        await mcp.list_files(None, ".")  # type: ignore
+        await mcp.list_files(None, mock_user_context, ".")  # type: ignore
 
 
 @pytest.mark.asyncio
-async def test_mcp_validation_whitespace_session_id(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_mcp_validation_whitespace_session_id(
+    mock_factory: Any, mock_runtime: Any, mock_user_context: Any
+) -> None:
     """Ensure whitespace strings are technically accepted by the validation check (truthy),
     but we want to ensure the system handles them as keys without crashing."""
     mcp = SandboxMCP()
     session_id = "   "
 
-    await mcp.execute_code(session_id, "python", "pass")
+    await mcp.execute_code(session_id, "python", "pass", mock_user_context)
     assert session_id in mcp.sessions
     mock_runtime.execute.assert_called_once()
 
@@ -59,12 +61,12 @@ async def test_mcp_validation_whitespace_session_id(mock_factory: Any, mock_runt
 
 
 @pytest.mark.asyncio
-async def test_mcp_validation_long_session_id(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_mcp_validation_long_session_id(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     """Ensure very long session IDs are handled correctly."""
     mcp = SandboxMCP()
     session_id = "a" * 1024
 
-    await mcp.execute_code(session_id, "python", "pass")
+    await mcp.execute_code(session_id, "python", "pass", mock_user_context)
     assert session_id in mcp.sessions
 
     await mcp.shutdown()

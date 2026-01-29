@@ -32,7 +32,9 @@ def mock_veritas() -> Any:
 
 
 @pytest.mark.asyncio
-async def test_complex_concurrent_mixed_validation(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_complex_concurrent_mixed_validation(
+    mock_factory: Any, mock_runtime: Any, mock_user_context: Any
+) -> None:
     """
     Simulate concurrent requests where some have valid IDs and some have invalid (empty) IDs.
     Ensure that invalid requests are rejected immediately without affecting valid sessions.
@@ -42,11 +44,11 @@ async def test_complex_concurrent_mixed_validation(mock_factory: Any, mock_runti
 
     # Define tasks
     async def valid_req() -> str:
-        res = await mcp.execute_code(valid_id, "python", "pass")
+        res = await mcp.execute_code(valid_id, "python", "pass", mock_user_context)
         return str(res["stdout"])
 
     async def invalid_req() -> None:
-        await mcp.execute_code("", "python", "pass")
+        await mcp.execute_code("", "python", "pass", mock_user_context)
 
     # Run concurrently
     # We expect valid_req to succeed and invalid_req to raise ValueError
@@ -66,7 +68,7 @@ async def test_complex_concurrent_mixed_validation(mock_factory: Any, mock_runti
 
 
 @pytest.mark.asyncio
-async def test_complex_rapid_lifecycle_mixed_ids(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_complex_rapid_lifecycle_mixed_ids(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     """
     Simulate a client rapidly creating sessions, some with valid keys, some invalid.
     """
@@ -79,7 +81,7 @@ async def test_complex_rapid_lifecycle_mixed_ids(mock_factory: Any, mock_runtime
     for sid in ids:
         try:
             # type check: ignore for None
-            await mcp.execute_code(sid, "python", "pass")  # type: ignore
+            await mcp.execute_code(sid, "python", "pass", mock_user_context)  # type: ignore
             results.append((sid, "success"))
         except ValueError:
             results.append((sid, "error"))

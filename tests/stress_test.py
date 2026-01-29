@@ -9,7 +9,7 @@ from coreason_sandbox.mcp import SandboxMCP
 
 
 @pytest.mark.asyncio
-async def test_stress_concurrency() -> None:
+async def test_stress_concurrency(mock_user_context: Any) -> None:
     """
     Stress test to verify SessionManager and DockerRuntime stability under high load.
     Simulates 50 concurrent sessions using a mocked Docker backend to test
@@ -68,7 +68,7 @@ async def test_stress_concurrency() -> None:
             code = f"print('Hello from {i}')"
 
             # Execute code
-            result = await mcp.execute_code(session_id, "python", code)
+            result = await mcp.execute_code(session_id, "python", code, mock_user_context)
 
             return result
 

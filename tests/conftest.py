@@ -2,6 +2,7 @@ from typing import Any, Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
+from coreason_identity.models import UserContext
 
 
 @pytest.fixture
@@ -35,8 +36,10 @@ def mock_veritas_integrator() -> Generator[Any, None, None]:
 
 @pytest.fixture
 def mock_vault_integrator() -> Generator[Any, None, None]:
-    # Since we moved logic to Config, we mock the Config source or the integrator inside it?
-    # Actually, Config is loaded at instantiation.
-    # If we want to mock vault secrets during Config init, we need to patch VaultIntegrator in config.py
     with patch("coreason_sandbox.config.VaultIntegrator") as mock:
         yield mock
+
+
+@pytest.fixture
+def mock_user_context() -> UserContext:
+    return UserContext(sub="test-user", email="test@example.com", permissions=["tester"])
