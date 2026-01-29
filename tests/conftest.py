@@ -39,10 +39,7 @@ def mock_vault_integrator() -> Generator[Any, None, None]:
     with patch("coreason_sandbox.config.VaultIntegrator") as mock:
         yield mock
 
+
 @pytest.fixture
 def mock_user_context() -> UserContext:
-    return UserContext(
-        sub="test-user",
-        email="test@example.com",
-        permissions=["tester"]
-    )
+    return UserContext(sub="test-user", email="test@example.com", permissions=["tester"])

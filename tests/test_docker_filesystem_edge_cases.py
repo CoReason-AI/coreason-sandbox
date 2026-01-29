@@ -21,37 +21,37 @@ def docker_runtime(mock_docker_client: Any) -> DockerRuntime:
 
 
 @pytest.mark.asyncio
-async def test_path_resolution_relative_subdir(docker_runtime: DockerRuntime) -> None:
+async def test_path_resolution_relative_subdir(docker_runtime: DockerRuntime, mock_user_context: Any) -> None:
     """Verify that a relative path 'subdir' resolves to '/home/user/subdir'."""
     assert docker_runtime.container is not None
     # Mock successful ls
     docker_runtime.container.exec_run.return_value = (0, b"file.txt\n")
 
-    await docker_runtime.list_files("subdir")
+    await docker_runtime.list_files("subdir", mock_user_context, "sid")
 
     # Verify the command sent to docker
     docker_runtime.container.exec_run.assert_called_with("ls -1 /home/user/subdir")
 
 
 @pytest.mark.asyncio
-async def test_path_resolution_absolute(docker_runtime: DockerRuntime) -> None:
+async def test_path_resolution_absolute(docker_runtime: DockerRuntime, mock_user_context: Any) -> None:
     """Verify that an absolute path is used as-is."""
     assert docker_runtime.container is not None
     docker_runtime.container.exec_run.return_value = (0, b"file.txt\n")
 
-    await docker_runtime.list_files("/tmp/custom")
+    await docker_runtime.list_files("/tmp/custom", mock_user_context, "sid")
 
     # Verify the command sent to docker
     docker_runtime.container.exec_run.assert_called_with("ls -1 /tmp/custom")
 
 
 @pytest.mark.asyncio
-async def test_path_resolution_dot(docker_runtime: DockerRuntime) -> None:
+async def test_path_resolution_dot(docker_runtime: DockerRuntime, mock_user_context: Any) -> None:
     """Verify that '.' resolves to '/home/user/.'."""
     assert docker_runtime.container is not None
     docker_runtime.container.exec_run.return_value = (0, b"file.txt\n")
 
-    await docker_runtime.list_files(".")
+    await docker_runtime.list_files(".", mock_user_context, "sid")
 
     docker_runtime.container.exec_run.assert_called_with("ls -1 /home/user/.")
 
@@ -72,7 +72,7 @@ async def test_start_creates_home_directory(mock_docker_client: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_upload_tar_structure(docker_runtime: DockerRuntime, tmp_path: Any) -> None:
+async def test_upload_tar_structure(docker_runtime: DockerRuntime, tmp_path: Any, mock_user_context: Any) -> None:
     """Verify that upload packs the file correctly relative to /home/user if needed."""
     # Note: upload uses os.path.dirname(remote_path) or "/" for put_archive path
     # and includes the basename in the tar.
@@ -81,7 +81,7 @@ async def test_upload_tar_structure(docker_runtime: DockerRuntime, tmp_path: Any
     local_file.write_text("data")
 
     # Case 1: Upload to root of home
-    await docker_runtime.upload(local_file, "/home/user/data.txt")
+    await docker_runtime.upload(local_file, "/home/user/data.txt", mock_user_context, "sid")
 
     assert docker_runtime.container is not None
     args, kwargs = docker_runtime.container.put_archive.call_args
@@ -90,7 +90,7 @@ async def test_upload_tar_structure(docker_runtime: DockerRuntime, tmp_path: Any
     assert dest_path == "/home/user"
 
     # Case 2: Upload to subdir
-    await docker_runtime.upload(local_file, "/home/user/subdir/data.txt")
+    await docker_runtime.upload(local_file, "/home/user/subdir/data.txt", mock_user_context, "sid")
 
     args, kwargs = docker_runtime.container.put_archive.call_args
     dest_path = kwargs.get("path") or args[0]

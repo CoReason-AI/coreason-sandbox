@@ -12,8 +12,8 @@ import asyncio
 import time
 from dataclasses import dataclass, field
 
-from loguru import logger
 from coreason_identity.models import UserContext
+from loguru import logger
 
 from coreason_sandbox.config import SandboxConfig
 from coreason_sandbox.factory import SandboxFactory
@@ -75,9 +75,7 @@ class SessionManager:
         if session_id in self.sessions:
             session = self.sessions[session_id]
             if session.owner_id != context.sub:
-                logger.warning(
-                    f"Unauthorized access attempt to session {session_id} by {context.sub}"
-                )
+                logger.warning(f"Unauthorized access attempt to session {session_id} by {context.sub}")
                 raise PermissionError("Session belongs to another user")
             session.last_accessed = time.time()
             return session
@@ -87,9 +85,7 @@ class SessionManager:
             if session_id in self.sessions:
                 session = self.sessions[session_id]
                 if session.owner_id != context.sub:
-                    logger.warning(
-                        f"Unauthorized access attempt to session {session_id} by {context.sub}"
-                    )
+                    logger.warning(f"Unauthorized access attempt to session {session_id} by {context.sub}")
                     raise PermissionError("Session belongs to another user")
                 session.last_accessed = time.time()
                 return session

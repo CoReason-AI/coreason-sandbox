@@ -9,7 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_sandbox
 
 from pathlib import Path
-from typing import Literal, Any
+from typing import Any, Literal
 
 import pytest
 from coreason_identity.models import UserContext

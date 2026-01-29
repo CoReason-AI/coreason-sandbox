@@ -6,10 +6,10 @@ from pathlib import Path
 from typing import Any, Callable, Literal, TypeVar
 
 import anyio
+from coreason_identity.models import UserContext
 from e2b_code_interpreter import Sandbox as E2BSandbox
 from loguru import logger
 
-from coreason_identity.models import UserContext
 from coreason_sandbox.artifacts import ArtifactManager
 from coreason_sandbox.models import ExecutionResult, FileReference
 from coreason_sandbox.runtime import SandboxRuntime

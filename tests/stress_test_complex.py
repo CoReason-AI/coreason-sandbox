@@ -9,7 +9,7 @@ from docker.errors import DockerException
 
 
 @pytest.mark.asyncio
-async def test_stress_mixed_workload() -> None:
+async def test_stress_mixed_workload(mock_user_context: Any) -> None:
     """
     Simulates a mixed workload with:
     1. Successful Python executions
@@ -71,7 +71,7 @@ async def test_stress_mixed_workload() -> None:
                 code = "FORCE_FAILURE"
 
             try:
-                res = await mcp.execute_code(session_id, "python", code)
+                res = await mcp.execute_code(session_id, "python", code, mock_user_context)
                 if behavior == 0:
                     assert res["exit_code"] == 0
                 elif behavior == 1:
@@ -104,7 +104,7 @@ async def test_stress_mixed_workload() -> None:
 
 
 @pytest.mark.asyncio
-async def test_stress_reaper_collision() -> None:
+async def test_stress_reaper_collision(mock_user_context: Any) -> None:
     """
     Simulates concurrent access while the reaper is removing idle sessions.
     """
@@ -128,7 +128,7 @@ async def test_stress_reaper_collision() -> None:
         mcp = SandboxMCP(config)
 
         # 1. Create a session
-        await mcp.execute_code("session-reap", "python", "print('init')")
+        await mcp.execute_code("session-reap", "python", "print('init')", mock_user_context)
 
         # 2. Wait for it to expire (sleep > idle_timeout)
         await asyncio.sleep(0.2)
@@ -141,7 +141,7 @@ async def test_stress_reaper_collision() -> None:
         async def spammer() -> str:
             try:
                 # get_or_create should resurrect the session if it was reaped
-                await mcp.execute_code("session-reap", "python", "print('spam')")
+                await mcp.execute_code("session-reap", "python", "print('spam')", mock_user_context)
                 return "ok"
             except Exception as e:
                 return f"error: {e}"

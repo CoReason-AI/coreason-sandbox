@@ -12,12 +12,12 @@ from typing import Literal
 
 import anyio
 import docker
+from coreason_identity.models import UserContext
 from docker.errors import DockerException
 from docker.models.containers import Container
 from loguru import logger
 from packaging.requirements import Requirement
 
-from coreason_identity.models import UserContext
 from coreason_sandbox.artifacts import ArtifactManager
 from coreason_sandbox.models import ExecutionResult, FileReference
 from coreason_sandbox.runtime import SandboxRuntime

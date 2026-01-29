@@ -13,8 +13,8 @@ from pathlib import Path
 import anyio
 import boto3
 from botocore.exceptions import ClientError
-from loguru import logger
 from coreason_identity.models import UserContext
+from loguru import logger
 
 
 class S3Storage:
