@@ -14,6 +14,7 @@ import anyio
 import boto3
 from botocore.exceptions import ClientError
 from loguru import logger
+from coreason_identity.models import UserContext
 
 
 class S3Storage:
@@ -45,12 +46,14 @@ class S3Storage:
             endpoint_url=endpoint_url,
         )
 
-    async def upload_file(self, file_path: Path, object_name: str) -> str:
+    async def upload_file(self, file_path: Path, object_name: str, context: UserContext, session_id: str) -> str:
         """Uploads a file to S3 and returns a presigned URL.
 
         Args:
             file_path: The local path to the file.
             object_name: The destination object key in S3.
+            context: The user context for the operation.
+            session_id: The session ID for the operation.
 
         Returns:
             str: A presigned URL to access the uploaded file.
@@ -62,14 +65,17 @@ class S3Storage:
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
 
-        logger.info(f"Uploading {file_path} to s3://{self.bucket}/{object_name}")
+        user_id = context.sub
+        object_key = f"artifacts/{user_id}/{session_id}/{object_name}"
+
+        logger.info(f"Uploading {file_path} to s3://{self.bucket}/{object_key}")
 
         def _upload_and_sign() -> str:
-            self.client.upload_file(str(file_path), self.bucket, object_name)
+            self.client.upload_file(str(file_path), self.bucket, object_key)
             # Generate signed URL (valid for 1 hour)
             url: str = self.client.generate_presigned_url(
                 ClientMethod="get_object",
-                Params={"Bucket": self.bucket, "Key": object_name},
+                Params={"Bucket": self.bucket, "Key": object_key},
                 ExpiresIn=3600,
             )
             return url

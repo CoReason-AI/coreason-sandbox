@@ -13,6 +13,7 @@ from typing import Any, AsyncIterator, Literal, cast
 
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ImageContent, TextContent
+from coreason_identity.models import UserContext
 
 from coreason_sandbox.mcp import SandboxMCP
 
@@ -51,9 +52,16 @@ async def execute_code(
     Returns:
         list[TextContent | ImageContent]: A list containing stdout, stderr, and any generated image artifacts.
     """
+    system_context = UserContext(
+        sub="cli-user",
+        email="cli@coreason.ai",
+        permissions=["system"],
+        project_context="cli",
+    )
+
     try:
         # execute_code returns a dict with stdout, stderr, exit_code, artifacts
-        result = await sandbox.execute_code(session_id, language, code)
+        result = await sandbox.execute_code(session_id, language, code, context=system_context)
     except Exception as e:
         return [TextContent(type="text", text=f"Error executing code: {e!s}")]
 
@@ -136,8 +144,14 @@ async def install_package(session_id: str, package_name: str) -> str:
     Returns:
         str: A success message or error description.
     """
+    system_context = UserContext(
+        sub="cli-user",
+        email="cli@coreason.ai",
+        permissions=["system"],
+        project_context="cli",
+    )
     try:
-        return await sandbox.install_package(session_id, package_name)
+        return await sandbox.install_package(session_id, package_name, context=system_context)
     except Exception as e:
         return f"Error installing package: {e!s}"
 
@@ -153,8 +167,14 @@ async def list_files(session_id: str, path: str = ".") -> list[str]:
     Returns:
         list[str]: A list of filenames or error description.
     """
+    system_context = UserContext(
+        sub="cli-user",
+        email="cli@coreason.ai",
+        permissions=["system"],
+        project_context="cli",
+    )
     try:
-        return await sandbox.list_files(session_id, path)
+        return await sandbox.list_files(session_id, context=system_context, path=path)
     except Exception as e:
         return [f"Error listing files: {e!s}"]
 

@@ -9,6 +9,7 @@ import anyio
 from e2b_code_interpreter import Sandbox as E2BSandbox
 from loguru import logger
 
+from coreason_identity.models import UserContext
 from coreason_sandbox.artifacts import ArtifactManager
 from coreason_sandbox.models import ExecutionResult, FileReference
 from coreason_sandbox.runtime import SandboxRuntime
@@ -70,13 +71,15 @@ class E2BRuntime(SandboxRuntime):
             logger.error(f"Failed to start E2B sandbox: {e}")
             raise
 
-    async def install_package(self, package_name: str) -> None:
+    async def install_package(self, package_name: str, context: UserContext, session_id: str) -> None:
         """Install a package dependency.
 
         Uses pip to install the package inside the E2B sandbox.
 
         Args:
             package_name: The name of the package to install.
+            context: The user context.
+            session_id: The session ID.
 
         Raises:
             RuntimeError: If the sandbox is not started.
@@ -96,11 +99,13 @@ class E2BRuntime(SandboxRuntime):
             logger.error(f"Failed to install package: {e}")
             raise
 
-    async def list_files(self, path: str) -> list[str]:
+    async def list_files(self, path: str, context: UserContext, session_id: str) -> list[str]:
         """List files in the directory.
 
         Args:
             path: The directory path to list.
+            context: The user context.
+            session_id: The session ID.
 
         Returns:
             list[str]: A list of filenames.
@@ -120,17 +125,19 @@ class E2BRuntime(SandboxRuntime):
             logger.error(f"Failed to list files: {e}")
             return []
 
-    async def _list_files_internal(self, path: str) -> set[str]:
+    async def _list_files_internal(self, path: str, context: UserContext, session_id: str) -> set[str]:
         """Helper to list files for artifact detection.
 
         Args:
             path: The directory path to list.
+            context: The user context.
+            session_id: The session ID.
 
         Returns:
             set[str]: A set of filenames.
         """
         try:
-            files = await self.list_files(path)
+            files = await self.list_files(path, context, session_id)
             return set(files)
         except Exception:
             return set()
@@ -162,7 +169,9 @@ class E2BRuntime(SandboxRuntime):
             await self.start()
             raise TimeoutError(f"Execution exceeded {self.timeout} seconds limit.") from e
 
-    async def execute(self, code: str, language: Literal["python", "bash", "r"]) -> ExecutionResult:
+    async def execute(
+        self, code: str, language: Literal["python", "bash", "r"], context: UserContext, session_id: str
+    ) -> ExecutionResult:
         """Run script and capture output.
 
         Executes the code in the E2B sandbox and captures native artifacts (PNGs)
@@ -171,6 +180,8 @@ class E2BRuntime(SandboxRuntime):
         Args:
             code: The source code to execute.
             language: The programming language.
+            context: The user context.
+            session_id: The session ID.
 
         Returns:
             ExecutionResult: The execution result including output and artifacts.
@@ -187,7 +198,7 @@ class E2BRuntime(SandboxRuntime):
         logger.info(f"Executing {language} code in E2B sandbox")
 
         # Filesystem artifact detection: Snapshot before
-        files_before = await self._list_files_internal(".")
+        files_before = await self._list_files_internal(".", context, session_id)
 
         start_time = time.time()
         stdout = ""
@@ -242,7 +253,7 @@ class E2BRuntime(SandboxRuntime):
             duration = time.time() - start_time
 
             # Filesystem artifact detection: Snapshot after
-            files_after = await self._list_files_internal(".")
+            files_after = await self._list_files_internal(".", context, session_id)
             new_files = files_after - files_before
 
             if new_files:
@@ -252,8 +263,8 @@ class E2BRuntime(SandboxRuntime):
                         remote_path = filename
                         local_path = tmp_dir / filename
                         try:
-                            await self.download(remote_path, local_path)
-                            ref = await self.artifact_manager.process_file(local_path, filename)
+                            await self.download(remote_path, local_path, context, session_id)
+                            ref = await self.artifact_manager.process_file(local_path, filename, context, session_id)
                             artifacts.append(ref)
                         except Exception as e:
                             logger.warning(f"Failed to retrieve artifact {filename}: {e}")
@@ -270,12 +281,14 @@ class E2BRuntime(SandboxRuntime):
             logger.error(f"E2B Execution failed: {e}")
             raise
 
-    async def upload(self, local_path: Path, remote_path: str) -> None:
+    async def upload(self, local_path: Path, remote_path: str, context: UserContext, session_id: str) -> None:
         """Inject file into the sandbox.
 
         Args:
             local_path: Path to the local file.
             remote_path: Destination path in the sandbox.
+            context: The user context.
+            session_id: The session ID.
 
         Raises:
             RuntimeError: If the sandbox is not started.
@@ -299,12 +312,14 @@ class E2BRuntime(SandboxRuntime):
             logger.error(f"E2B upload failed: {e}")
             raise
 
-    async def download(self, remote_path: str, local_path: Path) -> None:
+    async def download(self, remote_path: str, local_path: Path, context: UserContext, session_id: str) -> None:
         """Retrieve file from the sandbox.
 
         Args:
             remote_path: Path to the file in the sandbox.
             local_path: Destination path on the host.
+            context: The user context.
+            session_id: The session ID.
 
         Raises:
             RuntimeError: If the sandbox is not started.

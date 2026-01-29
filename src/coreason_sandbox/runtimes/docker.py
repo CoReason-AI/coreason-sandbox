@@ -17,6 +17,7 @@ from docker.models.containers import Container
 from loguru import logger
 from packaging.requirements import Requirement
 
+from coreason_identity.models import UserContext
 from coreason_sandbox.artifacts import ArtifactManager
 from coreason_sandbox.models import ExecutionResult, FileReference
 from coreason_sandbox.runtime import SandboxRuntime
@@ -86,26 +87,30 @@ class DockerRuntime(SandboxRuntime):
             logger.error(f"Failed to start Docker sandbox: {e}")
             raise
 
-    async def _list_files_internal(self, path: str) -> set[str]:
+    async def _list_files_internal(self, path: str, context: UserContext, session_id: str) -> set[str]:
         """Helper to list files for artifact detection.
 
         Args:
             path: The directory path to list.
+            context: The user context.
+            session_id: The session ID.
 
         Returns:
             set[str]: A set of filenames.
         """
         try:
-            files = await self.list_files(path)
+            files = await self.list_files(path, context, session_id)
             return set(files)
         except Exception:
             return set()
 
-    async def list_files(self, path: str) -> list[str]:
+    async def list_files(self, path: str, context: UserContext, session_id: str) -> list[str]:
         """List files in the directory.
 
         Args:
             path: The directory path to list.
+            context: The user context.
+            session_id: The session ID.
 
         Returns:
             list[str]: A list of filenames.
@@ -200,7 +205,7 @@ class DockerRuntime(SandboxRuntime):
             tar_stream.seek(0)
             return tar_stream.getvalue()
 
-    async def install_package(self, package_name: str) -> None:
+    async def install_package(self, package_name: str, context: UserContext, session_id: str) -> None:
         """Install a package dependency (pip only).
 
         Downloads the package and its dependencies on the host (handling cross-platform wheels),
@@ -208,6 +213,8 @@ class DockerRuntime(SandboxRuntime):
 
         Args:
             package_name: The name of the package to install.
+            context: The user context.
+            session_id: The session ID.
 
         Raises:
             RuntimeError: If the sandbox is not started or installation fails.
@@ -257,7 +264,9 @@ class DockerRuntime(SandboxRuntime):
             logger.error(f"Failed to install {package_name} in container: {msg}")
             raise RuntimeError(f"Failed to install package: {msg}")
 
-    async def execute(self, code: str, language: Literal["python", "bash", "r"]) -> ExecutionResult:
+    async def execute(
+        self, code: str, language: Literal["python", "bash", "r"], context: UserContext, session_id: str
+    ) -> ExecutionResult:
         """Run script and capture output.
 
         Executes the code in the container, enforcing timeouts and capturing stdout/stderr.
@@ -266,6 +275,8 @@ class DockerRuntime(SandboxRuntime):
         Args:
             code: The source code to execute.
             language: The programming language.
+            context: The user context.
+            session_id: The session ID.
 
         Returns:
             ExecutionResult: The execution result including output and artifacts.
@@ -281,7 +292,7 @@ class DockerRuntime(SandboxRuntime):
 
         logger.info(f"Executing {language} code in sandbox {self.container.short_id}")
 
-        files_before = await self._list_files_internal(self.work_dir)
+        files_before = await self._list_files_internal(self.work_dir, context, session_id)
 
         # Prepare the command based on language
         cmd: list[str]
@@ -317,7 +328,7 @@ class DockerRuntime(SandboxRuntime):
             stderr_str = stderr_bytes.decode("utf-8") if stderr_bytes else ""
 
             # Artifact detection
-            files_after = await self._list_files_internal(self.work_dir)
+            files_after = await self._list_files_internal(self.work_dir, context, session_id)
             new_files = files_after - files_before
 
             artifacts: list[FileReference] = []
@@ -328,8 +339,8 @@ class DockerRuntime(SandboxRuntime):
                     remote_path = f"{self.work_dir}/{filename}"
                     local_path = tmp_dir / filename
                     try:
-                        await self.download(remote_path, local_path)
-                        ref = await self.artifact_manager.process_file(local_path, filename)
+                        await self.download(remote_path, local_path, context, session_id)
+                        ref = await self.artifact_manager.process_file(local_path, filename, context, session_id)
                         artifacts.append(ref)
                     except Exception as e:
                         logger.warning(f"Failed to retrieve artifact {filename}: {e}")
@@ -348,12 +359,14 @@ class DockerRuntime(SandboxRuntime):
             logger.error(f"Execution failed: {e}")
             raise
 
-    async def upload(self, local_path: Path, remote_path: str) -> None:
+    async def upload(self, local_path: Path, remote_path: str, context: UserContext, session_id: str) -> None:
         """Inject file into the sandbox.
 
         Args:
             local_path: Path to the local file.
             remote_path: Destination path in the container.
+            context: The user context.
+            session_id: The session ID.
 
         Raises:
             RuntimeError: If the sandbox is not started.
@@ -384,12 +397,14 @@ class DockerRuntime(SandboxRuntime):
             logger.error(f"Upload failed: {e}")
             raise
 
-    async def download(self, remote_path: str, local_path: Path) -> None:
+    async def download(self, remote_path: str, local_path: Path, context: UserContext, session_id: str) -> None:
         """Retrieve file from the sandbox.
 
         Args:
             remote_path: Path to the file in the container.
             local_path: Destination path on the host.
+            context: The user context.
+            session_id: The session ID.
 
         Raises:
             RuntimeError: If the sandbox is not started.

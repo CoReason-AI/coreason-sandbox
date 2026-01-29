@@ -12,6 +12,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Literal
 
+from coreason_identity.models import UserContext
 from coreason_sandbox.models import ExecutionResult
 
 
@@ -34,7 +35,9 @@ class SandboxRuntime(ABC):
         pass  # pragma: no cover
 
     @abstractmethod
-    async def execute(self, code: str, language: Literal["python", "bash", "r"]) -> ExecutionResult:
+    async def execute(
+        self, code: str, language: Literal["python", "bash", "r"], context: UserContext, session_id: str
+    ) -> ExecutionResult:
         """Run script and capture output.
 
         Executes the provided code in the specified language within the sandbox.
@@ -42,6 +45,8 @@ class SandboxRuntime(ABC):
         Args:
             code: The source code to execute.
             language: The programming language of the code ('python', 'bash', 'r').
+            context: The user context.
+            session_id: The session ID.
 
         Returns:
             ExecutionResult: The result containing stdout, stderr, exit code, and artifacts.
@@ -54,7 +59,7 @@ class SandboxRuntime(ABC):
         pass  # pragma: no cover
 
     @abstractmethod
-    async def upload(self, local_path: Path, remote_path: str) -> None:
+    async def upload(self, local_path: Path, remote_path: str, context: UserContext, session_id: str) -> None:
         """Inject file into the sandbox.
 
         Uploads a file from the local filesystem to the sandbox environment.
@@ -62,6 +67,8 @@ class SandboxRuntime(ABC):
         Args:
             local_path: The path to the file on the local machine.
             remote_path: The destination path inside the sandbox.
+            context: The user context.
+            session_id: The session ID.
 
         Raises:
             FileNotFoundError: If the local file does not exist.
@@ -70,7 +77,7 @@ class SandboxRuntime(ABC):
         pass  # pragma: no cover
 
     @abstractmethod
-    async def download(self, remote_path: str, local_path: Path) -> None:
+    async def download(self, remote_path: str, local_path: Path, context: UserContext, session_id: str) -> None:
         """Retrieve file from the sandbox.
 
         Downloads a file from the sandbox environment to the local filesystem.
@@ -78,6 +85,8 @@ class SandboxRuntime(ABC):
         Args:
             remote_path: The path to the file inside the sandbox.
             local_path: The destination path on the local machine.
+            context: The user context.
+            session_id: The session ID.
 
         Raises:
             FileNotFoundError: If the remote file does not exist.
@@ -86,13 +95,15 @@ class SandboxRuntime(ABC):
         pass  # pragma: no cover
 
     @abstractmethod
-    async def install_package(self, package_name: str) -> None:
+    async def install_package(self, package_name: str, context: UserContext, session_id: str) -> None:
         """Install a package dependency.
 
         Installs a Python package in the sandbox environment.
 
         Args:
             package_name: The name of the package to install.
+            context: The user context.
+            session_id: The session ID.
 
         Raises:
             ValueError: If the package is not allowed by policy.
@@ -101,11 +112,13 @@ class SandboxRuntime(ABC):
         pass  # pragma: no cover
 
     @abstractmethod
-    async def list_files(self, path: str) -> list[str]:
+    async def list_files(self, path: str, context: UserContext, session_id: str) -> list[str]:
         """List files in the directory.
 
         Args:
             path: The directory path to list.
+            context: The user context.
+            session_id: The session ID.
 
         Returns:
             list[str]: A list of filenames in the directory.

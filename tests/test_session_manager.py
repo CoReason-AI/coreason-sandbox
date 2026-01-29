@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from coreason_sandbox.config import SandboxConfig
 from coreason_sandbox.session_manager import SessionManager
+from coreason_identity.models import UserContext
 
 
 @pytest.fixture
@@ -32,41 +33,68 @@ def mock_factory(mock_runtime: Any) -> Any:
 
 
 @pytest.mark.asyncio
-async def test_session_creation(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_session_creation(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     manager = SessionManager()
     session_id = "test_session"
 
-    session = await manager.get_or_create_session(session_id)
+    session = await manager.get_or_create_session(session_id, mock_user_context)
 
     assert session.runtime == mock_runtime
     mock_runtime.start.assert_called_once()
     assert session_id in manager.sessions
+    assert session.owner_id == "test-user"
 
 
 @pytest.mark.asyncio
-async def test_session_creation_invalid_id() -> None:
+async def test_session_creation_invalid_id(mock_user_context: Any) -> None:
     manager = SessionManager()
     with pytest.raises(ValueError, match="Session ID is required"):
-        await manager.get_or_create_session("")
+        await manager.get_or_create_session("", mock_user_context)
 
 
 @pytest.mark.asyncio
-async def test_session_reuse(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_session_creation_invalid_context() -> None:
+    manager = SessionManager()
+    with pytest.raises(ValueError, match="UserContext is required"):
+        await manager.get_or_create_session("sess", None) # type: ignore
+
+
+@pytest.mark.asyncio
+async def test_session_reuse(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     manager = SessionManager()
     session_id = "test_session"
 
     # Create first time
-    session1 = await manager.get_or_create_session(session_id)
+    session1 = await manager.get_or_create_session(session_id, mock_user_context)
 
     # Create second time
-    session2 = await manager.get_or_create_session(session_id)
+    session2 = await manager.get_or_create_session(session_id, mock_user_context)
 
     assert session1 is session2
     mock_runtime.start.assert_called_once()  # Should only be called once
 
 
 @pytest.mark.asyncio
-async def test_reaper_loop(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_session_access_denied(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
+    manager = SessionManager()
+    session_id = "test_session"
+
+    # Create with user1
+    await manager.get_or_create_session(session_id, mock_user_context)
+
+    # Try access with user2
+    other_context = UserContext(
+        sub="other-user",
+        email="other@example.com",
+        permissions=[],
+    )
+
+    with pytest.raises(PermissionError, match="Session belongs to another user"):
+        await manager.get_or_create_session(session_id, other_context)
+
+
+@pytest.mark.asyncio
+async def test_reaper_loop(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     # Config: Check every 0.01s, expire after 100s
     config = SandboxConfig(idle_timeout=100.0, reaper_interval=0.01)
     manager = SessionManager(config)
@@ -75,7 +103,7 @@ async def test_reaper_loop(mock_factory: Any, mock_runtime: Any) -> None:
     start_time = 1000.0
 
     with patch("coreason_sandbox.session_manager.time.time", return_value=start_time):
-        await manager.get_or_create_session("expired_session")
+        await manager.get_or_create_session("expired_session", mock_user_context)
 
     assert "expired_session" in manager.sessions
 
@@ -94,7 +122,7 @@ async def test_reaper_loop(mock_factory: Any, mock_runtime: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_reaper_loop_exception_handling(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_reaper_loop_exception_handling(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     """Test that reaper loop survives exceptions during session termination."""
     config = SandboxConfig(idle_timeout=0.1, reaper_interval=0.01)
     manager = SessionManager(config)
@@ -103,7 +131,7 @@ async def test_reaper_loop_exception_handling(mock_factory: Any, mock_runtime: A
     mock_runtime.terminate.side_effect = Exception("Terminate failed")
 
     with patch("coreason_sandbox.session_manager.time.time", return_value=1000.0):
-        await manager.get_or_create_session("fail_session")
+        await manager.get_or_create_session("fail_session", mock_user_context)
 
     # Advance time to expire it
     with patch("coreason_sandbox.session_manager.time.time", return_value=1100.0):
@@ -124,10 +152,6 @@ async def test_reaper_loop_exception_handling(mock_factory: Any, mock_runtime: A
 async def test_reaper_loop_crash_recovery() -> None:
     """
     Test that if reaper loop logic itself crashes (top level), it is handled.
-    (Though strictly speaking the try/except block inside loop handles specific logic errors,
-    an exception outside the while loop or critical failure might be hard to test without injecting into the method)
-
-    We can mock asyncio.sleep to raise an exception once?
     """
     manager = SessionManager(SandboxConfig(reaper_interval=0.01))
 
@@ -141,10 +165,10 @@ async def test_reaper_loop_crash_recovery() -> None:
 
 
 @pytest.mark.asyncio
-async def test_shutdown(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_shutdown(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     manager = SessionManager()
-    await manager.get_or_create_session("s1")
-    await manager.get_or_create_session("s2")
+    await manager.get_or_create_session("s1", mock_user_context)
+    await manager.get_or_create_session("s2", mock_user_context)
 
     assert len(manager.sessions) == 2
     assert manager._reaper_task is not None
@@ -157,9 +181,9 @@ async def test_shutdown(mock_factory: Any, mock_runtime: Any) -> None:
 
 
 @pytest.mark.asyncio
-async def test_shutdown_with_error(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_shutdown_with_error(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     manager = SessionManager()
-    await manager.get_or_create_session("s1")
+    await manager.get_or_create_session("s1", mock_user_context)
     mock_runtime.terminate.side_effect = Exception("Fail")
 
     await manager.shutdown()
@@ -169,26 +193,26 @@ async def test_shutdown_with_error(mock_factory: Any, mock_runtime: Any) -> None
 
 
 @pytest.mark.asyncio
-async def test_runtime_start_failure(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_runtime_start_failure(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     """Verify that if runtime.start() fails, the session is not cached."""
     manager = SessionManager()
     mock_runtime.start.side_effect = Exception("Start failed")
 
     with pytest.raises(Exception, match="Start failed"):
-        await manager.get_or_create_session("fail_start")
+        await manager.get_or_create_session("fail_start", mock_user_context)
 
     # Session should not be in the dictionary
     assert "fail_start" not in manager.sessions
 
     # Subsequent success should work
     mock_runtime.start.side_effect = None
-    session = await manager.get_or_create_session("fail_start")
+    session = await manager.get_or_create_session("fail_start", mock_user_context)
     assert session is not None
     assert "fail_start" in manager.sessions
 
 
 @pytest.mark.asyncio
-async def test_zero_idle_timeout(mock_factory: Any, mock_runtime: Any) -> None:
+async def test_zero_idle_timeout(mock_factory: Any, mock_runtime: Any, mock_user_context: Any) -> None:
     """Verify behavior when idle_timeout is 0 (immediate expiration)."""
     # Config: 0 timeout
     config = SandboxConfig(idle_timeout=0.0, reaper_interval=0.01)
@@ -198,7 +222,7 @@ async def test_zero_idle_timeout(mock_factory: Any, mock_runtime: Any) -> None:
     # If we insert a session, it is immediately expired.
 
     with patch("coreason_sandbox.session_manager.time.time", return_value=1000.0):
-        await manager.get_or_create_session("immediate_expire")
+        await manager.get_or_create_session("immediate_expire", mock_user_context)
 
     assert "immediate_expire" in manager.sessions
 

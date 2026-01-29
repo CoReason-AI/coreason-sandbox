@@ -13,6 +13,7 @@ import time
 from dataclasses import dataclass, field
 
 from loguru import logger
+from coreason_identity.models import UserContext
 
 from coreason_sandbox.config import SandboxConfig
 from coreason_sandbox.factory import SandboxFactory
@@ -23,6 +24,7 @@ from coreason_sandbox.runtime import SandboxRuntime
 class Session:
     runtime: SandboxRuntime
     last_accessed: float
+    owner_id: str
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     active: bool = True
 
@@ -45,7 +47,7 @@ class SessionManager:
         self._reaper_task: asyncio.Task[None] | None = None
         self._creation_lock = asyncio.Lock()
 
-    async def get_or_create_session(self, session_id: str) -> Session:
+    async def get_or_create_session(self, session_id: str, context: UserContext) -> Session:
         """Retrieve existing session or create a new one.
 
         Updates the last_accessed timestamp for the session.
@@ -53,21 +55,30 @@ class SessionManager:
 
         Args:
             session_id: The unique identifier for the session.
+            context: The user context for the session.
 
         Returns:
             Session: The active session object.
 
         Raises:
-            ValueError: If session_id is empty.
+            ValueError: If session_id is empty or context is missing.
+            PermissionError: If session belongs to another user.
         """
         if not session_id:
             raise ValueError("Session ID is required")
+        if not context:
+            raise ValueError("UserContext is required")
 
         await self._start_reaper_if_needed()
 
         # Optimistic check
         if session_id in self.sessions:
             session = self.sessions[session_id]
+            if session.owner_id != context.sub:
+                logger.warning(
+                    f"Unauthorized access attempt to session {session_id} by {context.sub}"
+                )
+                raise PermissionError("Session belongs to another user")
             session.last_accessed = time.time()
             return session
 
@@ -75,16 +86,29 @@ class SessionManager:
             # Double-check inside lock
             if session_id in self.sessions:
                 session = self.sessions[session_id]
+                if session.owner_id != context.sub:
+                    logger.warning(
+                        f"Unauthorized access attempt to session {session_id} by {context.sub}"
+                    )
+                    raise PermissionError("Session belongs to another user")
                 session.last_accessed = time.time()
                 return session
 
-            logger.info(f"Creating new session: {session_id}")
             runtime = SandboxFactory.get_runtime(self.config)
+            logger.info(
+                "Allocating sandbox session",
+                user_id=context.sub,
+                runtime=type(runtime).__name__,
+            )
 
             # Start the runtime immediately
             await runtime.start()
 
-            session = Session(runtime=runtime, last_accessed=time.time())
+            session = Session(
+                runtime=runtime,
+                last_accessed=time.time(),
+                owner_id=context.sub,
+            )
             self.sessions[session_id] = session
             return session
 

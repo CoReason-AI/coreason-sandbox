@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Literal
 
 from loguru import logger
+from coreason_identity.models import UserContext
 
 from coreason_sandbox.config import SandboxConfig
 from coreason_sandbox.integrations.veritas import VeritasIntegrator
@@ -52,7 +53,7 @@ class SandboxMCP:
         return self.session_manager._reaper_task
 
     @asynccontextmanager
-    async def _session_scope(self, session_id: str) -> AsyncIterator[Session]:
+    async def _session_scope(self, session_id: str, context: UserContext) -> AsyncIterator[Session]:
         """Context manager to acquire a locked, active session.
 
         Retries if session is terminated during acquisition (race condition).
@@ -60,6 +61,7 @@ class SandboxMCP:
 
         Args:
             session_id: The unique identifier for the session.
+            context: The user context for the session.
 
         Yields:
             Session: An active, locked session.
@@ -71,7 +73,7 @@ class SandboxMCP:
             raise ValueError("Session ID is required")
 
         while True:
-            session = await self.session_manager.get_or_create_session(session_id)
+            session = await self.session_manager.get_or_create_session(session_id, context)
 
             async with session.lock:
                 if not session.active:
@@ -87,7 +89,11 @@ class SandboxMCP:
                 break
 
     async def execute_code(
-        self, session_id: str, language: Literal["python", "bash", "r"], code: str
+        self,
+        session_id: str,
+        language: Literal["python", "bash", "r"],
+        code: str,
+        context: UserContext,
     ) -> dict[str, str | int | float | list[dict[str, Any]]]:
         """Execute code in the sandbox for the given session.
 
@@ -95,15 +101,22 @@ class SandboxMCP:
             session_id: The unique identifier for the session.
             language: The programming language to use ('python', 'bash', 'r').
             code: The source code to execute.
+            context: The user context.
 
         Returns:
             dict: A dictionary containing stdout, stderr, exit_code, duration, and artifacts.
         """
-        async with self._session_scope(session_id) as session:
+        async with self._session_scope(session_id, context) as session:
             # Veritas Audit Log
             await self.veritas.log_pre_execution(code, language)
 
-            result = await session.runtime.execute(code, language)
+            logger.info(
+                "Executing code in sandbox",
+                user_id=context.sub,
+                session_id=str(session_id),
+            )
+
+            result = await session.runtime.execute(code, language, context, session_id)
 
         # Convert artifacts to simpler dicts for MCP response if needed
         artifacts_data = [
@@ -123,33 +136,35 @@ class SandboxMCP:
             "artifacts": artifacts_data,
         }
 
-    async def install_package(self, session_id: str, package_name: str) -> str:
+    async def install_package(self, session_id: str, package_name: str, context: UserContext) -> str:
         """Install a package in the sandbox session.
 
         Args:
             session_id: The unique identifier for the session.
             package_name: The name of the package to install.
+            context: The user context.
 
         Returns:
             str: A success message.
         """
-        async with self._session_scope(session_id) as session:
-            await session.runtime.install_package(package_name)
+        async with self._session_scope(session_id, context) as session:
+            await session.runtime.install_package(package_name, context, session_id)
 
         return f"Package {package_name} installed successfully."
 
-    async def list_files(self, session_id: str, path: str = ".") -> list[str]:
+    async def list_files(self, session_id: str, context: UserContext, path: str = ".") -> list[str]:
         """List files in the sandbox session directory.
 
         Args:
             session_id: The unique identifier for the session.
+            context: The user context.
             path: The directory path to list (default: ".").
 
         Returns:
             list[str]: A list of filenames.
         """
-        async with self._session_scope(session_id) as session:
-            files = await session.runtime.list_files(path)
+        async with self._session_scope(session_id, context) as session:
+            files = await session.runtime.list_files(path, context, session_id)
 
         return files
 
