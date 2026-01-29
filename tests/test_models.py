@@ -9,9 +9,8 @@
 # Source Code: https://github.com/CoReason-AI/coreason_sandbox
 
 import pytest
-from pydantic import ValidationError
-
 from coreason_sandbox.models import ExecutionResult, FileReference
+from pydantic import ValidationError
 
 
 def test_file_reference_creation() -> None:

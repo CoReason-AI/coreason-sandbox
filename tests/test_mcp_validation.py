@@ -1,7 +1,6 @@
 from typing import Any
 
 import pytest
-
 from coreason_sandbox.mcp import SandboxMCP
 
 

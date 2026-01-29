@@ -14,7 +14,6 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from coreason_identity.models import UserContext
-
 from coreason_sandbox.config import SandboxConfig
 from coreason_sandbox.session_manager import SessionManager
 

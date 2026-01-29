@@ -2,9 +2,8 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-from docker.errors import DockerException
-
 from coreason_sandbox.runtimes.docker import DockerRuntime
+from docker.errors import DockerException
 
 
 @pytest.fixture
