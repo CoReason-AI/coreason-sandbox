@@ -166,10 +166,7 @@ class Sandbox:
         Returns:
             ExecutionResult: The result of the execution.
         """
-        from typing import cast
-
-        result = anyio.run(self._async.execute, code, context, language)
-        return cast(ExecutionResult, result)
+        return anyio.run(self._async.execute, code, context, language)
 
     def upload(self, local_path: Path, remote_path: str, context: UserContext) -> None:
         """Uploads a file to the sandbox synchronously.
@@ -210,7 +207,4 @@ class Sandbox:
         Returns:
             list[str]: A list of filenames.
         """
-        from typing import cast
-
-        result = anyio.run(self._async.list_files, context, path)
-        return cast(list[str], result)
+        return anyio.run(self._async.list_files, context, path)

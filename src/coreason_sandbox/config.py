@@ -3,7 +3,7 @@ from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class SandboxConfig(BaseSettings):  # type: ignore[misc]
+class SandboxConfig(BaseSettings):
     """Configuration for the Sandbox environment.
 
     Attributes:

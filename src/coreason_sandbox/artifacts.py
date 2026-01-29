@@ -3,7 +3,7 @@ import mimetypes
 from pathlib import Path
 from typing import Protocol
 
-import aiofiles  # type: ignore[import-untyped]
+import aiofiles
 from coreason_identity.models import UserContext
 
 from coreason_sandbox.models import FileReference

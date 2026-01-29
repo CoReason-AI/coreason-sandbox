@@ -81,10 +81,7 @@ class S3Storage:
             return url
 
         try:
-            from typing import cast
-
-            result = await anyio.to_thread.run_sync(_upload_and_sign)
-            return cast(str, result)
+            return await anyio.to_thread.run_sync(_upload_and_sign)
         except ClientError as e:
             logger.error(f"Failed to upload file to S3: {e}")
             raise
