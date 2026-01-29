@@ -65,7 +65,7 @@ class S3Storage:
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
 
-        user_id = context.sub
+        user_id = context.user_id
         object_key = f"artifacts/{user_id}/{session_id}/{object_name}"
 
         logger.info(f"Uploading {file_path} to s3://{self.bucket}/{object_key}")

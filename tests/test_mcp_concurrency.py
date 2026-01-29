@@ -84,7 +84,7 @@ async def _run_race_test(
     )
     mock_runtime2.list_files.return_value = ["retry_file"]
 
-    session2 = Session(runtime=mock_runtime2, last_accessed=0, owner_id=mock_user_context.sub)
+    session2 = Session(runtime=mock_runtime2, last_accessed=0, owner_id=mock_user_context.user_id)
 
     # Patch the method on the session_manager instance
     with patch.object(mcp.session_manager, "get_or_create_session", side_effect=[session1, session2]):
@@ -180,7 +180,7 @@ async def test_thundering_herd_on_dying_session(mock_factory: Any, mock_runtime:
     mock_runtime2.execute.return_value = ExecutionResult(
         stdout="herd_success", stderr="", exit_code=0, artifacts=[], execution_duration=0.1
     )
-    session2 = Session(runtime=mock_runtime2, last_accessed=0, owner_id=mock_user_context.sub)
+    session2 = Session(runtime=mock_runtime2, last_accessed=0, owner_id=mock_user_context.user_id)
 
     # 3. Patch get_or_create_session to return session1 (doomed) first for ALL concurrent calls,
     #    then session2 for the retry.
